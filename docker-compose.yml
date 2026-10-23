@@ -1,0 +1,75 @@
+services:
+  # ── 1. Database: PostgreSQL 16 ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cyberedki_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cyberedki}
+      POSTGRES_USER: ${POSTGRES_USER:-edki_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edki_secure_pass2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-edki_user} -d ${POSTGRES_DB:-cyberedki}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cyberedki_net
+
+  # ── 2. Backend API: Node.js / Express ──────────────────────────────
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: cyberedki_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 5000
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-edki_user}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-edki_secure_pass2026}
+      PGDATABASE: ${POSTGRES_DB:-cyberedki}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cyberedki_net
+
+  # ── 3. Frontend: React + Vite SPA ──────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: cyberedki_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - cyberedki_net
+
+  # ── 4. Reverse Proxy Gateway: Nginx ─────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: cyberedki_nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - cyberedki_net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  cyberedki_net:
+    driver: bridge

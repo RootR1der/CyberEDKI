@@ -1,0 +1,512 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { AppUser, AcademicGroup, AuditLogEntry, UserRole } from '../types/edki';
+import { MOCK_USERS, MOCK_ACADEMIC_GROUPS } from '../data/mockUsers';
+
+interface AuthContextType {
+  currentUser: AppUser | null;
+  allUsers: AppUser[];
+  academicGroups: AcademicGroup[];
+  auditLogs: AuditLogEntry[];
+  isLoggedIn: boolean;
+
+  // Permissions helpers
+  isStudent: boolean;
+  isTeacher: boolean;
+  isAdmin: boolean;
+  canEditContent: boolean; // Teacher & Admin
+  canManageTeachers: boolean; // Admin only
+  canManageStudents: boolean; // Teacher & Admin
+
+  // Auth actions
+  login: (username: string, password: string) => { success: boolean; message: string };
+  logout: () => void;
+
+  // User management
+  switchUser: (userId: string) => void; // Admin-only impersonation helper
+  addStudent: (data: {
+    firstName: string;
+    lastName: string;
+    groupName: string;
+    email?: string;
+    username: string;
+    password: string;
+  }) => AppUser;
+  registerStudent: (data: {
+    firstName: string;
+    lastName: string;
+    groupName: string;
+    email?: string;
+    username: string;
+    password: string;
+  }) => { success: boolean; message: string; user?: AppUser };
+  bulkAddStudents: (groupName: string, namesList: string[]) => number;
+  addTeacher: (data: { name: string; department: string; email: string; username: string; password: string }) => AppUser;
+  updateUserStatus: (userId: string, isActive: boolean) => void;
+  resetUserPassword: (userId: string, newPassword: string) => void;
+  deleteUser: (userId: string) => void;
+  addAcademicGroup: (name: string, course: number) => AcademicGroup;
+  deleteAcademicGroup: (groupId: string) => void;
+  sendPasswordResetCode: (emailOrUsername: string) => { success: boolean; message: string; code?: string; email?: string };
+  resetPasswordByEmail: (emailOrUsername: string, newPassword: string) => { success: boolean; message: string };
+  addAuditLog: (action: string, details: string) => void;
+}
+
+const STORAGE_KEYS = {
+  USERS: 'cyberedki_users_v4',
+  CURRENT_USER_ID: 'cyberedki_session_user_id_v4',
+  GROUPS: 'cyberedki_groups_v4',
+  LOGS: 'cyberedki_audit_logs_v4'
+};
+
+const transliterateGroupSlug = (text: string) => {
+  const map: Record<string, string> = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'є': 'ye', 'ж': 'zh',
+    'з': 'z', 'и': 'y', 'і': 'i', 'ї': 'yi', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n',
+    'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+    'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ь': '', 'ю': 'yu', 'я': 'ya'
+  };
+  return text.toLowerCase().split('').map(c => map[c] ?? c).join('').replace(/[^a-z0-9]/g, '');
+};
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 1. Users state
+  const [allUsers, setAllUsers] = useState<AppUser[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure credentials for Admin, Teacher, and Student match requirements
+          return parsed.map((u: AppUser) => {
+            if (u.role === 'admin' || u.username.toLowerCase() === 'admin' || u.username.toLowerCase() === 'adm1n') {
+              return { ...u, username: 'AdM1n', password: 'te6tadm1N' };
+            }
+            if (u.id === 'user-teacher-1' || u.username.toLowerCase() === 'v.petrenko' || u.username.toLowerCase() === 'teacher') {
+              return { ...u, username: 'Teacher', password: 'te6tTeac4' };
+            }
+            if (u.id === 'user-student-1' || u.username.toLowerCase() === 'o.kovalenko' || u.username.toLowerCase() === 'student') {
+              return { ...u, username: 'Student', password: 'Stu2eNt' };
+            }
+            return u;
+          });
+        }
+      } catch (e) {}
+    }
+    return MOCK_USERS;
+  });
+
+  // 2. Current session user ID (null = not logged in)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
+  });
+
+  // 3. Academic Groups
+  const [academicGroups, setAcademicGroups] = useState<AcademicGroup[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.GROUPS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((g: AcademicGroup) => ({
+            ...g,
+            inviteToken: g.inviteToken || (transliterateGroupSlug(g.name) + '-' + Math.random().toString(36).substring(2, 8)),
+            inviteEnabled: g.inviteEnabled ?? true
+          }));
+        }
+      } catch (e) {}
+    }
+    return MOCK_ACADEMIC_GROUPS;
+  });
+
+  // 4. Audit Logs
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.LOGS);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      {
+        id: 'log-init',
+        timestamp: new Date().toISOString(),
+        userId: 'system',
+        userName: 'Система CyberEDKI',
+        userRole: 'admin' as UserRole,
+        action: 'Ініціалізація платформи',
+        details: 'Завантажено 7 офіційних кластерів та базу нормативних тестів ЄДКІ.'
+      }
+    ];
+  });
+
+  // Persist state
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(allUsers)); }, [allUsers]);
+  useEffect(() => {
+    if (currentUserId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    }
+  }, [currentUserId]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(academicGroups)); }, [academicGroups]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(auditLogs)); }, [auditLogs]);
+
+  const currentUser = currentUserId ? (allUsers.find(u => u.id === currentUserId) || null) : null;
+  const isLoggedIn = currentUser !== null;
+
+  // ── Audit log helper (uses currentUser if available) ────────────────────────
+  const addAuditLog = (action: string, details: string) => {
+    const newEntry: AuditLogEntry = {
+      id: 'log-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      userId: currentUser?.id || 'system',
+      userName: currentUser?.name || 'Система',
+      userRole: currentUser?.role || 'admin',
+      action,
+      details
+    };
+    setAuditLogs(prev => [newEntry, ...prev.slice(0, 199)]);
+  };
+
+  // ── Authentication ───────────────────────────────────────────────────────────
+  const login = (username: string, password: string): { success: boolean; message: string } => {
+    const trimmed = username.trim().toLowerCase();
+    let user = allUsers.find(
+      u => u.username.toLowerCase() === trimmed && u.password === password
+    );
+
+    // Fallback: check localStorage in case state has not flushed yet
+    if (!user) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            user = parsed.find((u: AppUser) => u.username.toLowerCase() === trimmed && u.password === password);
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!user) {
+      return { success: false, message: 'Невірний логін або пароль' };
+    }
+    if (!user.isActive) {
+      return { success: false, message: 'Ваш обліковий запис деактивовано. Зверніться до адміністратора або викладача.' };
+    }
+
+    setCurrentUserId(user.id);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
+
+    // Log the event after state update (currentUser will be null here, so we directly log)
+    setAuditLogs(prev => [{
+      id: 'log-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: 'Вхід до системи',
+      details: `Успішна авторизація: ${user.username} (${user.role})`
+    }, ...prev.slice(0, 199)]);
+
+    return { success: true, message: `Ласкаво просимо, ${user.firstName}!` };
+  };
+
+  const logout = () => {
+    if (currentUser) {
+      addAuditLog('Вихід із системи', `Сеанс завершено: ${currentUser.username}`);
+    }
+    setCurrentUserId(null);
+  };
+
+  // ── Admin impersonation (admin can "enter" as any user for debug) ────────────
+  const switchUser = (userId: string) => {
+    const user = allUsers.find(u => u.id === userId);
+    if (user) {
+      setCurrentUserId(userId);
+      addAuditLog('Адмін-перехід до облікового запису', `${user.name} (${user.role})`);
+    }
+  };
+
+  // ── User management ──────────────────────────────────────────────────────────
+  const registerStudent = (data: {
+    firstName: string;
+    lastName: string;
+    groupName: string;
+    email?: string;
+    username: string;
+    password: string;
+  }): { success: boolean; message: string; user?: AppUser } => {
+    const cleanUsername = data.username.trim();
+    if (allUsers.some(u => u.username.toLowerCase() === cleanUsername.toLowerCase())) {
+      return { success: false, message: `Логін "${cleanUsername}" уже зайнятий. Будь ласка, оберіть інший.` };
+    }
+    const cleanEmail = data.email?.trim();
+    if (cleanEmail && allUsers.some(u => u.email && u.email.toLowerCase() === cleanEmail.toLowerCase())) {
+      return { success: false, message: `Користувач із поштою "${cleanEmail}" вже зареєстрований.` };
+    }
+
+    const newStudent: AppUser = {
+      id: 'stud-' + Date.now(),
+      name: `${data.lastName.trim()} ${data.firstName.trim()}`,
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      role: 'student',
+      groupName: data.groupName,
+      email: cleanEmail || `${cleanUsername}@stud.edu.ua`,
+      username: cleanUsername,
+      password: data.password,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    // Update state and immediately persist users
+    setAllUsers(prev => {
+      const updated = [...prev, newStudent];
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
+      return updated;
+    });
+
+    // Directly set user session so the user is instantly logged in
+    setCurrentUserId(newStudent.id);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newStudent.id);
+
+    setAuditLogs(prev => [{
+      id: 'log-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      userId: newStudent.id,
+      userName: newStudent.name,
+      userRole: 'student',
+      action: 'Реєстрація студента',
+      details: `Успішна самостійна реєстрація: ${newStudent.username} (група ${newStudent.groupName})`
+    }, ...prev.slice(0, 199)]);
+
+    return { success: true, message: `Ласкаво просимо, ${newStudent.firstName}!`, user: newStudent };
+  };
+
+  const addStudent = (data: {
+    firstName: string;
+    lastName: string;
+    groupName: string;
+    email?: string;
+    username: string;
+    password: string;
+  }): AppUser => {
+    const newStudent: AppUser = {
+      id: 'stud-' + Date.now(),
+      name: `${data.lastName} ${data.firstName}`,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: 'student',
+      groupName: data.groupName,
+      email: data.email || `${data.username}@stud.edu.ua`,
+      username: data.username,
+      password: data.password,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    setAllUsers(prev => {
+      const updated = [...prev, newStudent];
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
+      return updated;
+    });
+    addAuditLog('Додано нового студента', `${newStudent.name}, група ${newStudent.groupName}, логін: ${newStudent.username}`);
+    return newStudent;
+  };
+
+  const bulkAddStudents = (groupName: string, namesList: string[]): number => {
+    let count = 0;
+    const newStudents: AppUser[] = [];
+
+    namesList.forEach((fullName, idx) => {
+      const trimmed = fullName.trim();
+      if (!trimmed) return;
+      const parts = trimmed.split(' ');
+      const lastName = parts[0] || 'Студент';
+      const firstName = parts.slice(1).join(' ') || 'Ім\'я';
+      const baseUsername = `${lastName.toLowerCase()}.${firstName[0]?.toLowerCase() || 'x'}${groupName.toLowerCase().replace('-', '')}`;
+
+      newStudents.push({
+        id: 'stud-' + (Date.now() + idx),
+        name: `${lastName} ${firstName}`,
+        firstName,
+        lastName,
+        role: 'student',
+        groupName,
+        email: `${baseUsername}@stud.edu.ua`,
+        username: baseUsername,
+        password: 'Student1234',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      });
+      count++;
+    });
+
+    if (newStudents.length > 0) {
+      setAllUsers(prev => [...prev, ...newStudents]);
+      addAuditLog('Груповий імпорт студентів', `Додано ${newStudents.length} студентів до групи ${groupName}. Пароль за замовчуванням: Student1234`);
+    }
+    return count;
+  };
+
+  const addTeacher = (data: { name: string; department: string; email: string; username: string; password: string }): AppUser => {
+    const parts = data.name.split(' ');
+    const newTeacher: AppUser = {
+      id: 'teach-' + Date.now(),
+      name: data.name,
+      firstName: parts[1] || data.name,
+      lastName: parts[0] || '',
+      role: 'teacher',
+      department: data.department,
+      email: data.email,
+      username: data.username,
+      password: data.password,
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+
+    setAllUsers(prev => [...prev, newTeacher]);
+    addAuditLog('Призначено викладача', `${newTeacher.name}, ${newTeacher.department}, логін: ${newTeacher.username}`);
+    return newTeacher;
+  };
+
+  const updateUserStatus = (userId: string, isActive: boolean) => {
+    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive } : u));
+    const user = allUsers.find(u => u.id === userId);
+    addAuditLog(
+      isActive ? 'Активовано доступ' : 'Деактивовано доступ',
+      `Користувач: ${user?.name || userId}`
+    );
+    // If the deactivated user is currently logged in, force logout
+    if (!isActive && userId === currentUserId) {
+      setCurrentUserId(null);
+    }
+  };
+
+  const resetUserPassword = (userId: string, newPassword: string) => {
+    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, password: newPassword } : u));
+    const user = allUsers.find(u => u.id === userId);
+    addAuditLog('Скинуто пароль', `Пароль змінено для: ${user?.name || userId}`);
+  };
+
+  const deleteUser = (userId: string) => {
+    const user = allUsers.find(u => u.id === userId);
+    setAllUsers(prev => prev.filter(u => u.id !== userId));
+    addAuditLog('Видалено користувача', `${user?.name || userId} (${user?.role})`);
+    if (userId === currentUserId) setCurrentUserId(null);
+  };
+
+  const addAcademicGroup = (name: string, course: number): AcademicGroup => {
+    const newGrp: AcademicGroup = {
+      id: 'grp-' + Date.now(),
+      name,
+      course,
+      specialty: '125 Кібербезпека',
+      studentCount: 0,
+      inviteToken: name.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Math.random().toString(36).substring(2, 8),
+      inviteEnabled: true
+    };
+    setAcademicGroups(prev => [...prev, newGrp]);
+    addAuditLog('Створено академічну групу', `Група ${name} (${course} курс)`);
+    return newGrp;
+  };
+
+  const deleteAcademicGroup = (groupId: string) => {
+    const grp = academicGroups.find(g => g.id === groupId || g.name === groupId);
+    if (!grp) return;
+    setAcademicGroups(prev => prev.filter(g => g.id !== grp.id));
+    setAllUsers(prev => prev.map(u => u.groupName === grp.name ? { ...u, groupName: undefined } : u));
+    addAuditLog('Видалено академічну групу', `Група ${grp.name} (${grp.course} курс) видалена з системи`);
+  };
+
+  // ── Password recovery via email ──────────────────────────────────────────
+  const sendPasswordResetCode = (emailOrUsername: string): { success: boolean; message: string; code?: string; email?: string } => {
+    const clean = emailOrUsername.trim().toLowerCase();
+    const user = allUsers.find(
+      u => (u.email && u.email.trim().toLowerCase() === clean) ||
+           u.username.trim().toLowerCase() === clean
+    );
+    if (!user) {
+      return { success: false, message: 'Користувача з такою електронною поштою або логіном не знайдено в системі.' };
+    }
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const targetEmail = user.email || `${user.username}@stud.edu.ua`;
+    addAuditLog('Запит на відновлення пароля', `Згенеровано код відновлення для ${user.name} (${targetEmail})`);
+    return {
+      success: true,
+      message: `Код підтвердження надіслано на вашу електронну пошту (${targetEmail})`,
+      code,
+      email: targetEmail
+    };
+  };
+
+  const resetPasswordByEmail = (emailOrUsername: string, newPassword: string): { success: boolean; message: string } => {
+    const clean = emailOrUsername.trim().toLowerCase();
+    const user = allUsers.find(
+      u => (u.email && u.email.trim().toLowerCase() === clean) ||
+           u.username.trim().toLowerCase() === clean
+    );
+    if (!user) {
+      return { success: false, message: 'Користувача не знайдено.' };
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: 'Пароль має містити щонайменше 6 символів.' };
+    }
+    setAllUsers(prev => prev.map(u => u.id === user.id ? { ...u, password: newPassword } : u));
+    addAuditLog('Відновлення пароля через email', `Успішно змінено пароль для ${user.name} (${user.email || user.username})`);
+    return { success: true, message: 'Пароль успішно змінено! Тепер ви можете увійти.' };
+  };
+
+  const isStudent = currentUser?.role === 'student';
+  const isTeacher = currentUser?.role === 'teacher';
+  const isAdmin = currentUser?.role === 'admin';
+  const canEditContent = isTeacher || isAdmin;
+  const canManageTeachers = isAdmin;
+  const canManageStudents = isTeacher || isAdmin;
+
+  return (
+    <AuthContext.Provider
+      value={{
+        currentUser,
+        allUsers,
+        academicGroups,
+        auditLogs,
+        isLoggedIn,
+        isStudent,
+        isTeacher,
+        isAdmin,
+        canEditContent,
+        canManageTeachers,
+        canManageStudents,
+        login,
+        logout,
+        switchUser,
+        addStudent,
+        registerStudent,
+        bulkAddStudents,
+        addTeacher,
+        updateUserStatus,
+        resetUserPassword,
+        deleteUser,
+        addAcademicGroup,
+        deleteAcademicGroup,
+        sendPasswordResetCode,
+        resetPasswordByEmail,
+        addAuditLog
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return ctx;
+};

@@ -1,0 +1,297 @@
+import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { EdkiProvider, useEdki } from './context/EdkiContext';
+import { Navbar, TabType } from './components/Navbar';
+import { Dashboard } from './components/Dashboard';
+import { QuizEngine } from './components/QuizEngine';
+import { SubjectCatalog } from './components/Catalog';
+import { MistakesBank } from './components/Mistakes';
+import { SourcesLibrary } from './components/Sources';
+import { AdminPanel } from './components/Admin';
+import { TrainingSetup } from './components/Training';
+import { TeacherDashboard } from './components/Teacher';
+import { ClustersView } from './components/Clusters';
+import { LoginPage } from './components/Login';
+import { Question, TestMode } from './types/edki';
+import { SUBJECTS_DATA } from './data/subjects';
+import { EDKI_CLUSTERS_DATA } from './data/clusters';
+
+const MainAppContent: React.FC = () => {
+  const { questions, mistakes, generateBalancedExamQuestions } = useEdki();
+  const { isTeacher, isAdmin, isLoggedIn } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | undefined>(undefined);
+
+  // Active Quiz State
+  const [activeQuiz, setActiveQuiz] = useState<{
+    isActive: boolean;
+    questions: Question[];
+    mode: TestMode;
+    title: string;
+    subjectId?: number;
+    clusterId?: number;
+    timeLimitSeconds?: number;
+  }>({
+    isActive: false,
+    questions: [],
+    mode: 'learning',
+    title: ''
+  });
+
+  // Standard login / registration screen when not logged in
+  if (!isLoggedIn) {
+    return <LoginPage onLoginSuccess={() => {}} />;
+  }
+
+
+  // Launch Official Exam Simulation (100 questions, 120 min, balanced by 7 clusters / all topics)
+  const handleStartExam = () => {
+    const examQuestions = generateBalancedExamQuestions(100);
+
+    setActiveQuiz({
+      isActive: true,
+      questions: examQuestions,
+      mode: 'simulation',
+      title: 'Офіційна симуляція ЄДКІ: 125 «Кібербезпека» (100 завдань / 1 год 20 хв)',
+      timeLimitSeconds: 4800 // 80 minutes (1 hour 20 minutes) = 4800 seconds
+    });
+  };
+
+  // Launch Cluster Drill (by specific cluster 1..7)
+  const handleStartClusterDrill = (clusterId: number) => {
+    const cluster = EDKI_CLUSTERS_DATA.find(c => c.id === clusterId);
+    const clusterQuestions = questions.filter(q => {
+      const sub = SUBJECTS_DATA.find(s => s.id === q.subjectId);
+      return q.clusterId === clusterId || sub?.clusterId === clusterId;
+    });
+
+    if (clusterQuestions.length === 0) {
+      alert(`Наразі немає додаткових завдань для кластеру ${clusterId}`);
+      return;
+    }
+
+    setActiveQuiz({
+      isActive: true,
+      questions: clusterQuestions,
+      mode: 'cluster',
+      clusterId,
+      title: `Кластер ${clusterId}: ${cluster?.name || ''}`,
+      timeLimitSeconds: 1200
+    });
+  };
+
+  // Launch Topic Drill
+  const handleStartTopicDrill = (subjectId: number) => {
+    const sub = SUBJECTS_DATA.find(s => s.id === subjectId);
+    const subQuestions = questions.filter(q => q.subjectId === subjectId);
+
+    if (subQuestions.length === 0) {
+      setSelectedSubjectId(subjectId);
+      setActiveTab('training');
+      return;
+    }
+
+    setActiveQuiz({
+      isActive: true,
+      questions: subQuestions,
+      mode: 'topic',
+      title: `Тематичний тренажер: ${sub?.name || 'Предмет'}`,
+      subjectId,
+      timeLimitSeconds: 900
+    });
+  };
+
+  // Launch Mistakes Workout
+  const handleStartMistakesDrill = () => {
+    const mistakeQuestions = Object.values(mistakes)
+      .filter(m => !m.isMastered)
+      .map(m => questions.find(q => q.id === m.questionId))
+      .filter((q): q is Question => q !== undefined);
+
+    if (mistakeQuestions.length === 0) {
+      alert('У вас немає активних помилок для повторення! Чудова робота.');
+      return;
+    }
+
+    setActiveQuiz({
+      isActive: true,
+      questions: mistakeQuestions,
+      mode: 'mistakes',
+      title: `Робота над помилками (${mistakeQuestions.length} завдань)`,
+      timeLimitSeconds: 1200
+    });
+  };
+
+  // Launch Blitz Quiz
+  const handleStartBlitz = () => {
+    const shuffled = [...questions].sort(() => 0.5 - Math.random());
+    const blitzQuestions = shuffled.slice(0, Math.min(10, shuffled.length));
+
+    setActiveQuiz({
+      isActive: true,
+      questions: blitzQuestions,
+      mode: 'blitz',
+      title: 'Швидкий бліц-тест (10 питань)',
+      timeLimitSeconds: 600
+    });
+  };
+
+  // Launch Custom Quiz
+  const handleStartCustomQuiz = (quizQuestions: Question[], title: string, mode: TestMode = 'learning', subjectId?: number) => {
+    setActiveQuiz({
+      isActive: true,
+      questions: quizQuestions,
+      mode,
+      title,
+      subjectId,
+      timeLimitSeconds: 1200
+    });
+  };
+
+  const handleExitQuiz = () => {
+    setActiveQuiz({
+      isActive: false,
+      questions: [],
+      mode: 'learning',
+      title: ''
+    });
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
+      <Navbar 
+        activeTab={activeTab} 
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          if (activeQuiz.isActive) {
+            handleExitQuiz();
+          }
+        }}
+        onStartExam={handleStartExam}
+        isQuizActive={activeQuiz.isActive}
+      />
+
+      <main className="app-container" style={{ flex: 1, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+        {activeQuiz.isActive ? (
+          <QuizEngine
+            questions={activeQuiz.questions}
+            mode={activeQuiz.mode}
+            title={activeQuiz.title}
+            subjectId={activeQuiz.subjectId}
+            timeLimitSeconds={activeQuiz.timeLimitSeconds}
+            onExit={handleExitQuiz}
+          />
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <Dashboard
+                onStartExam={handleStartExam}
+                onStartTopicDrill={handleStartTopicDrill}
+                onStartClusterDrill={handleStartClusterDrill}
+                onStartMistakesDrill={handleStartMistakesDrill}
+                onStartBlitz={handleStartBlitz}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+              />
+            )}
+
+            {activeTab === 'clusters' && (
+              <ClustersView onStartClusterDrill={handleStartClusterDrill} />
+            )}
+
+            {activeTab === 'training' && (
+              <TrainingSetup
+                preselectedSubjectId={selectedSubjectId}
+                onStartQuiz={(qs, mode, title, subId) => handleStartCustomQuiz(qs, title, mode, subId)}
+              />
+            )}
+
+            {activeTab === 'simulation' && (
+              <div className="glass-card" style={{ padding: 'clamp(18px, 4vw, 36px)', textAlign: 'center', maxWidth: '750px', margin: '0 auto' }}>
+                <h2 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.8rem)', marginBottom: '12px' }}>
+                  Офіційна симуляція ЄДКІ: 125 «Кібербезпека»
+                </h2>
+                <div style={{ display: 'inline-flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <span className="badge badge-cyan" style={{ fontSize: '0.78rem', padding: '5px 12px' }}>⏱ Тривалість: 1 год 20 хв (80 хв)</span>
+                  <span className="badge badge-indigo" style={{ fontSize: '0.78rem', padding: '5px 12px' }}>📝 100 тестових завдань</span>
+                  <span className="badge badge-emerald" style={{ fontSize: '0.78rem', padding: '5px 12px' }}>🎯 Прохідний бал: 60%</span>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.6, fontSize: '0.9rem' }}>
+                  Повноцінний екзаменаційний тест із <strong>100 запитань</strong> з усіх тем та <strong>7 офіційних кластерів компетенцій</strong>:
+                  Нормативна база (8-12%), ІТ в кібербезпеці (14-18%), Безпека ІКС (15-25%), КСЗІ (8-10%), Управління безпекою (16-20%), Криптографія (11-15%), ТЗІ (12-16%).
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" onClick={handleStartExam} style={{ fontSize: '0.94rem', padding: '12px 22px' }}>
+                    Розпочати симуляцію (100 питань, 1 год 20 хв)
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')} style={{ fontSize: '0.94rem' }}>
+                    Повернутися назад
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'catalog' && (
+              <SubjectCatalog onStartSubjectDrill={handleStartTopicDrill} />
+            )}
+
+            {activeTab === 'mistakes' && (
+              <MistakesBank onStartMistakesDrill={handleStartMistakesDrill} />
+            )}
+
+
+
+            {activeTab === 'sources' && (
+              <SourcesLibrary />
+            )}
+
+            {/* TEACHER DASHBOARD */}
+            {activeTab === 'teacher' && (isTeacher || isAdmin) && (
+              <TeacherDashboard 
+                onNavigateTab={(t) => setActiveTab(t)}
+              />
+            )}
+
+            {/* ADMIN PANEL */}
+            {activeTab === 'admin_panel' && isAdmin && (
+              <AdminPanel />
+            )}
+          </>
+        )}
+      </main>
+
+
+
+      {/* Footer */}
+      <footer style={{
+        borderTop: '1px solid var(--border-subtle)',
+        background: 'rgba(8, 12, 21, 0.95)',
+        padding: '24px',
+        textAlign: 'center',
+        fontSize: '0.82rem',
+        color: 'var(--text-muted)'
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <strong>CyberEDKI</strong> — Комплексна навчальна система підготовки та контролю якості до ЄДКІ з кібербезпеки (Спеціальність 125)
+          </div>
+          <div>
+            7 офіційних кластерів МОН України • ДСТУ 3396 • Постанова КМУ №518 • Common Criteria
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export function App() {
+  return (
+    <AuthProvider>
+      <EdkiProvider>
+        <MainAppContent />
+      </EdkiProvider>
+    </AuthProvider>
+  );
+}
+
+export default App;
