@@ -94,16 +94,16 @@ export const ClustersView: React.FC<ClustersViewProps> = ({ onStartClusterDrill 
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ textAlign: 'right' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', width: '100%', marginTop: '6px' }}>
+                  <div style={{ textAlign: 'left' }}>
                     <div style={{
-                      fontSize: '1rem',
+                      fontSize: '0.94rem',
                       fontWeight: 800,
                       color: mastery.answered > 0 ? (mastery.accuracy >= 60 ? 'var(--accent-emerald)' : 'var(--accent-amber)') : 'var(--text-muted)'
                     }}>
                       {mastery.answered > 0 ? `${mastery.accuracy}% точність` : 'Не складався'}
                     </div>
-                    <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                       {clusterQuestions.length} тестових завдань
                     </div>
                   </div>
@@ -111,9 +111,9 @@ export const ClustersView: React.FC<ClustersViewProps> = ({ onStartClusterDrill 
                   <button
                     className="btn btn-primary"
                     onClick={() => onStartClusterDrill(cluster.id)}
-                    style={{ padding: '8px 18px' }}
+                    style={{ padding: '8px 16px', fontSize: '0.86rem' }}
                   >
-                    <Play size={16} />
+                    <Play size={15} />
                     <span>Тренувати кластер</span>
                   </button>
                 </div>

@@ -532,9 +532,9 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header bar */}
-      <div className="glass-card" style={{ padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="glass-card" style={{ padding: 'clamp(14px, 3.5vw, 24px) clamp(12px, 3.5vw, 28px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>
+          <h2 style={{ fontSize: 'clamp(1.2rem, 4vw, 1.6rem)', marginBottom: '6px' }}>
             Каталог навчальної програми ЄДКІ
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -623,20 +623,25 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
               {/* Subject Header */}
               <div 
                 style={{
-                  padding: '18px 24px',
+                  padding: 'clamp(12px, 3vw, 18px)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
                   cursor: 'pointer',
                   userSelect: 'none',
-                  background: isExpanded ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
+                  background: isExpanded ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
+                  minWidth: 0,
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}
                 onClick={() => toggleSubject(sub.id)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 'min(100%, 260px)' }}>
                   <div style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '10px',
                     background: 'rgba(6, 182, 212, 0.1)',
                     border: '1px solid rgba(6, 182, 212, 0.3)',
@@ -644,15 +649,17 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'var(--accent-cyan)',
-                    fontWeight: 700
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    marginTop: '2px'
                   }}>
                     {sub.id}
                   </div>
 
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <span className="mono-code" style={{ fontSize: '0.72rem' }}>{sub.code}</span>
-                      <h3 style={{ fontSize: '1.08rem', fontWeight: 600 }}>{sub.name}</h3>
+                      <h3 style={{ fontSize: 'clamp(0.96rem, 3.2vw, 1.1rem)', fontWeight: 600, wordBreak: 'break-word' }}>{sub.name}</h3>
                       {sub.isOfficial ? (
                         <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>Офіційна програма</span>
                       ) : (
@@ -660,14 +667,14 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                       )}
                       <span className="badge badge-indigo" style={{ fontSize: '0.65rem' }}>Кластер {sub.clusterId}</span>
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45, wordBreak: 'break-word' }}>
                       {sub.description}
                     </p>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }} onClick={e => e.stopPropagation()}>
-                  <div style={{ textAlign: 'right', marginRight: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ textAlign: 'right', marginRight: '4px' }}>
                     <div style={{ fontSize: '0.88rem', fontWeight: 700, color: mastery.answered > 0 ? 'var(--accent-emerald)' : 'var(--text-muted)' }}>
                       {mastery.answered > 0 ? `${mastery.accuracy}%` : '—'}
                     </div>
@@ -681,21 +688,21 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                       <button
                         className="btn btn-secondary"
                         title="Імпортувати питання у цей предмет"
-                        style={{ padding: '6px 10px', fontSize: '0.78rem', gap: '5px' }}
+                        style={{ padding: '6px 9px', fontSize: '0.76rem', gap: '4px' }}
                         onClick={() => openImportModal(sub.id)}
                       >
                         <Upload size={13} color="var(--accent-cyan)" />
-                        <span>Імпорт</span>
+                        <span className="desktop-only">Імпорт</span>
                       </button>
 
                       <button
                         className="btn btn-secondary"
                         title="Редагувати предмет"
-                        style={{ padding: '6px 10px', fontSize: '0.78rem', gap: '5px' }}
+                        style={{ padding: '6px 9px', fontSize: '0.76rem', gap: '4px' }}
                         onClick={() => openEditSubjectModal(sub)}
                       >
                         <Edit2 size={13} color="var(--accent-cyan)" />
-                        <span>Редагувати</span>
+                        <span className="desktop-only">Редагувати</span>
                       </button>
                       <button
                         className="btn btn-secondary"
@@ -710,7 +717,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
 
                   <button
                     className="btn btn-primary"
-                    style={{ padding: '7px 14px', fontSize: '0.8rem' }}
+                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                     onClick={() => onStartSubjectDrill(sub.id)}
                   >
                     <Play size={14} />
@@ -723,7 +730,9 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                       border: 'none',
                       color: 'var(--text-muted)',
                       cursor: 'pointer',
-                      padding: '4px'
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center'
                     }}
                     onClick={() => toggleSubject(sub.id)}
                   >
@@ -735,9 +744,12 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
               {/* Expanded Topics & Subtopics Tree */}
               {isExpanded && (
                 <div style={{
-                  padding: '16px 24px 24px 68px',
+                  padding: 'clamp(10px, 2.5vw, 16px) clamp(10px, 2.5vw, 18px) clamp(14px, 3vw, 20px) clamp(10px, 2.5vw, 18px)',
                   borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                  background: 'rgba(0, 0, 0, 0.2)'
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  minWidth: 0,
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {sub.topics.map(topic => {
@@ -1073,11 +1085,13 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                                     {/* Question Options */}
                                     <div style={{
                                       display: 'grid',
-                                      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                      gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+                                      width: '100%',
+                                      minWidth: 0,
                                       gap: '8px',
                                       marginTop: '4px'
                                     }}>
-                                      {q.options.map(opt => {
+                                      {[...q.options].sort((a, b) => a.id.localeCompare(b.id)).map(opt => {
                                         const isCorrect = opt.id === q.correctAnswer;
                                         return (
                                           <div

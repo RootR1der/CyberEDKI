@@ -565,9 +565,9 @@ export const AdminPanel: React.FC = () => {
 
       {/* ── AUDIT LOG TAB ────────────────────────────────────────────────── */}
       {activeTab === 'audit' && (
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="glass-card" style={{ padding: 'clamp(14px, 3.5vw, 24px)', width: '100%', boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'clamp(1rem, 3.5vw, 1.25rem)' }}>
               <History size={18} color="var(--accent-cyan)" />
               Системний журнал аудиту ({auditLogs.length} записів)
             </h3>
@@ -578,11 +578,13 @@ export const AdminPanel: React.FC = () => {
               const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a'); a.href = url; a.download = 'audit_log.csv'; a.click();
-            }} style={{ fontSize: '0.82rem' }}>
+            }} style={{ fontSize: '0.82rem', padding: '6px 14px' }}>
               <Download size={14} /> Завантажити CSV
             </button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '550px', overflowY: 'auto' }}>
+
+          {/* Desktop View: Structured rows */}
+          <div className="desktop-block" style={{ flexDirection: 'column', gap: '6px', maxHeight: '550px', overflowY: 'auto' }}>
             {auditLogs.map(log => (
               <div key={log.id} style={{
                 padding: '10px 14px',
@@ -605,9 +607,45 @@ export const AdminPanel: React.FC = () => {
                 }}>
                   {log.userRole}
                 </span>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{log.action}</span>
                   {log.details && <span style={{ color: 'var(--text-muted)' }}> — {log.details}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile View: Event Cards */}
+          <div className="mobile-block" style={{ flexDirection: 'column', gap: '8px', maxHeight: '550px', overflowY: 'auto' }}>
+            {auditLogs.map(log => (
+              <div key={log.id} style={{
+                padding: '10px 12px',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '5px',
+                fontSize: '0.83rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                    {new Date(log.timestamp).toLocaleString('uk-UA')}
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', flexShrink: 0,
+                    background: log.userRole === 'admin' ? 'rgba(244,63,94,0.2)' : log.userRole === 'teacher' ? 'rgba(99,102,241,0.2)' : 'rgba(0,212,255,0.15)',
+                    color: log.userRole === 'admin' ? 'var(--accent-rose)' : log.userRole === 'teacher' ? 'var(--accent-indigo)' : 'var(--accent-cyan)'
+                  }}>
+                    {log.userRole}
+                  </span>
+                </div>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                  {log.userName}
+                </div>
+                <div style={{ fontSize: '0.82rem', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.45 }}>
+                  <span style={{ fontWeight: 600, color: 'var(--accent-cyan-light)' }}>{log.action}</span>
+                  {log.details && <span style={{ color: 'var(--text-secondary)' }}> — {log.details}</span>}
                 </div>
               </div>
             ))}
@@ -1014,8 +1052,8 @@ export const AdminPanel: React.FC = () => {
           </div>
 
           {/* Filter and Search Bar */}
-          <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '260px' }}>
+          <div className="glass-card" style={{ padding: 'clamp(12px, 3vw, 16px)', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 'min(100%, 240px)' }}>
               <Search size={16} color="var(--text-muted)" />
               <input
                 style={{ ...inputStyle, padding: '8px 12px' }}
@@ -1024,7 +1062,7 @@ export const AdminPanel: React.FC = () => {
                 onChange={e => setSearchAttempt(e.target.value)}
               />
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {[
                 { key: 'all', label: 'Всі' },
                 { key: 'disqualified', label: 'Порушення / Дискваліфікації' },
@@ -1044,133 +1082,277 @@ export const AdminPanel: React.FC = () => {
           </div>
 
           {/* Attempts List */}
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldAlert size={18} color="var(--accent-rose)" />
-              Журнал протоколів тестувань та прокторингу
-            </h3>
+          {(() => {
+            const filteredAttempts = attempts.filter(a => {
+              const matchesSearch =
+                (a.studentName || '').toLowerCase().includes(searchAttempt.toLowerCase()) ||
+                (a.groupName || '').toLowerCase().includes(searchAttempt.toLowerCase()) ||
+                (a.title || '').toLowerCase().includes(searchAttempt.toLowerCase());
+              if (!matchesSearch) return false;
+              if (filterDisqualified === 'disqualified') return a.disqualified;
+              if (filterDisqualified === 'passed') return a.passed && !a.disqualified;
+              if (filterDisqualified === 'failed') return !a.passed && !a.disqualified;
+              return true;
+            });
 
-            {attempts.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-                <p>Ще немає жодної завершеної спроби тестування.</p>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '12px 10px' }}>Студент / Група</th>
-                      <th style={{ padding: '12px 10px' }}>Режим / Тест</th>
-                      <th style={{ padding: '12px 10px' }}>Результат</th>
-                      <th style={{ padding: '12px 10px' }}>Статус прокторингу</th>
-                      <th style={{ padding: '12px 10px' }}>Причина / Порушення</th>
-                      <th style={{ padding: '12px 10px' }}>Час початку та завершення</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attempts
-                      .filter(a => {
-                        const matchesSearch =
-                          (a.studentName || '').toLowerCase().includes(searchAttempt.toLowerCase()) ||
-                          (a.groupName || '').toLowerCase().includes(searchAttempt.toLowerCase()) ||
-                          (a.title || '').toLowerCase().includes(searchAttempt.toLowerCase());
-                        if (!matchesSearch) return false;
-                        if (filterDisqualified === 'disqualified') return a.disqualified;
-                        if (filterDisqualified === 'passed') return a.passed && !a.disqualified;
-                        if (filterDisqualified === 'failed') return !a.passed && !a.disqualified;
-                        return true;
-                      })
-                      .map(a => {
-                        return (
-                          <tr key={a.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '12px 10px' }}>
-                              <div style={{ fontWeight: 600 }}>{a.studentName || 'Гість'}</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            return (
+              <div className="glass-card" style={{ padding: 'clamp(14px, 3.5vw, 24px)', width: '100%', boxSizing: 'border-box' }}>
+                <h3 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'clamp(1rem, 3.5vw, 1.25rem)' }}>
+                  <ShieldAlert size={18} color="var(--accent-rose)" />
+                  Журнал протоколів тестувань та прокторингу ({filteredAttempts.length})
+                </h3>
+
+                {filteredAttempts.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                    <p>Не знайдено жодної спроби тестування за обраними критеріями.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop View: Table */}
+                    <div className="desktop-block" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                            <th style={{ padding: '12px 10px' }}>Студент / Група</th>
+                            <th style={{ padding: '12px 10px' }}>Режим / Тест</th>
+                            <th style={{ padding: '12px 10px' }}>Результат</th>
+                            <th style={{ padding: '12px 10px' }}>Статус прокторингу</th>
+                            <th style={{ padding: '12px 10px' }}>Причина / Порушення</th>
+                            <th style={{ padding: '12px 10px' }}>Час початку та завершення</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredAttempts.map(a => (
+                            <tr key={a.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ fontWeight: 600 }}>{a.studentName || 'Гість'}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  {a.groupName ? `Група: ${a.groupName}` : 'Без групи'}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ fontWeight: 500 }}>{a.title}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>
+                                  {a.mode === 'simulation' ? '⚡ Офіційна симуляція ЄДКІ' : a.mode}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                <div style={{ fontWeight: 700, color: a.disqualified ? 'var(--accent-rose)' : a.passed ? 'var(--accent-emerald)' : '#f59e0b' }}>
+                                  {a.disqualified ? '0%' : `${a.scorePercentage}%`}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  {a.correctCount} / {a.totalQuestions} правильних
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 10px' }}>
+                                {a.disqualified ? (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '4px 8px', borderRadius: '4px',
+                                    background: 'rgba(244, 63, 94, 0.15)', color: 'var(--accent-rose)',
+                                    fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(244, 63, 94, 0.3)'
+                                  }}>
+                                    <AlertTriangle size={12} /> ДИСКВАЛІФІКОВАНО
+                                  </span>
+                                ) : a.passed ? (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '4px 8px', borderRadius: '4px',
+                                    background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)',
+                                    fontWeight: 600, fontSize: '0.75rem'
+                                  }}>
+                                    <CheckCircle size={12} /> Складено
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                    padding: '4px 8px', borderRadius: '4px',
+                                    background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b',
+                                    fontWeight: 600, fontSize: '0.75rem'
+                                  }}>
+                                    Не складено
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 10px', maxWidth: '300px' }}>
+                                {a.disqualified ? (
+                                  <div>
+                                    <div style={{ color: 'var(--accent-rose)', fontWeight: 600, fontSize: '0.8rem' }}>
+                                      {a.terminationReason || 'Порушення правил прокторингу'}
+                                    </div>
+                                    {a.violations && a.violations.length > 0 && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                                        {a.violations.map(v => (
+                                          <div key={v.id} style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                            • {v.description} ({new Date(v.timestamp).toLocaleTimeString('uk-UA')})
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Порушень не зафіксовано</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-primary)', fontSize: '0.78rem' }}>
+                                  <Clock size={12} color="var(--text-muted)" />
+                                  {a.startedAt ? new Date(a.startedAt).toLocaleString('uk-UA') : a.date}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  Завершено: {a.completedAt ? new Date(a.completedAt).toLocaleTimeString('uk-UA') : '-'} (тривалість: {Math.floor(a.durationSeconds / 60)}хв {a.durationSeconds % 60}с)
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile View: Protocol Cards */}
+                    <div className="mobile-block" style={{ flexDirection: 'column', gap: '12px' }}>
+                      {filteredAttempts.map(a => (
+                        <div
+                          key={a.id}
+                          style={{
+                            background: 'rgba(15, 23, 42, 0.7)',
+                            border: `1px solid ${a.disqualified ? 'rgba(244, 63, 94, 0.4)' : 'var(--border-subtle)'}`,
+                            borderRadius: 'var(--radius-md)',
+                            padding: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}
+                        >
+                          {/* Header: Student & Status */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#ffffff' }}>
+                                {a.studentName || 'Гість'}
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                                 {a.groupName ? `Група: ${a.groupName}` : 'Без групи'}
                               </div>
-                            </td>
-                            <td style={{ padding: '12px 10px' }}>
-                              <div style={{ fontWeight: 500 }}>{a.title}</div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>
-                                {a.mode === 'simulation' ? '⚡ Офіційна симуляція ЄДКІ' : a.mode}
-                              </div>
-                            </td>
-                            <td style={{ padding: '12px 10px' }}>
-                              <div style={{ fontWeight: 700, color: a.disqualified ? 'var(--accent-rose)' : a.passed ? 'var(--accent-emerald)' : '#f59e0b' }}>
-                                {a.disqualified ? '0%' : `${a.scorePercentage}%`}
-                              </div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                {a.correctCount} / {a.totalQuestions} правильних
-                              </div>
-                            </td>
-                            <td style={{ padding: '12px 10px' }}>
+                            </div>
+
+                            <div>
                               {a.disqualified ? (
                                 <span style={{
                                   display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                  padding: '4px 8px', borderRadius: '4px',
+                                  padding: '3px 8px', borderRadius: '4px',
                                   background: 'rgba(244, 63, 94, 0.15)', color: 'var(--accent-rose)',
-                                  fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(244, 63, 94, 0.3)'
+                                  fontWeight: 700, fontSize: '0.72rem', border: '1px solid rgba(244, 63, 94, 0.3)'
                                 }}>
                                   <AlertTriangle size={12} /> ДИСКВАЛІФІКОВАНО
                                 </span>
                               ) : a.passed ? (
                                 <span style={{
                                   display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                  padding: '4px 8px', borderRadius: '4px',
+                                  padding: '3px 8px', borderRadius: '4px',
                                   background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)',
-                                  fontWeight: 600, fontSize: '0.75rem'
+                                  fontWeight: 600, fontSize: '0.72rem'
                                 }}>
                                   <CheckCircle size={12} /> Складено
                                 </span>
                               ) : (
                                 <span style={{
                                   display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                  padding: '4px 8px', borderRadius: '4px',
+                                  padding: '3px 8px', borderRadius: '4px',
                                   background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b',
-                                  fontWeight: 600, fontSize: '0.75rem'
+                                  fontWeight: 600, fontSize: '0.72rem'
                                 }}>
                                   Не складено
                                 </span>
                               )}
-                            </td>
-                            <td style={{ padding: '12px 10px', maxWidth: '300px' }}>
-                              {a.disqualified ? (
-                                <div>
-                                  <div style={{ color: 'var(--accent-rose)', fontWeight: 600, fontSize: '0.8rem' }}>
-                                    {a.terminationReason || 'Порушення правил прокторингу'}
-                                  </div>
-                                  {a.violations && a.violations.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
-                                      {a.violations.map(v => (
-                                        <div key={v.id} style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                          • {v.description} ({new Date(v.timestamp).toLocaleTimeString('uk-UA')})
-                                        </div>
-                                      ))}
+                            </div>
+                          </div>
+
+                          {/* Test Title & Mode */}
+                          <div style={{
+                            padding: '8px 10px',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255, 255, 255, 0.04)'
+                          }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                              {a.title}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', marginTop: '2px' }}>
+                              {a.mode === 'simulation' ? '⚡ Офіційна симуляція ЄДКІ' : a.mode}
+                            </div>
+                          </div>
+
+                          {/* Stats Grid: Score & Time */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, 1fr)',
+                            gap: '8px',
+                            paddingTop: '2px'
+                          }}>
+                            <div style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>РЕЗУЛЬТАТ</div>
+                              <div style={{
+                                fontSize: '1.2rem',
+                                fontWeight: 800,
+                                color: a.disqualified ? 'var(--accent-rose)' : a.passed ? 'var(--accent-emerald)' : '#f59e0b'
+                              }}>
+                                {a.disqualified ? '0%' : `${a.scorePercentage}%`}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                {a.correctCount} / {a.totalQuestions} правильних
+                              </div>
+                            </div>
+
+                            <div style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ТРИВАЛІСТЬ</div>
+                              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ffffff', marginTop: '4px' }}>
+                                {Math.floor(a.durationSeconds / 60)}хв {a.durationSeconds % 60}с
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {a.startedAt ? new Date(a.startedAt).toLocaleTimeString('uk-UA') : ''}
+                                {a.completedAt ? ` - ${new Date(a.completedAt).toLocaleTimeString('uk-UA')}` : ''}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Violations / Reasons if any */}
+                          {a.disqualified && (
+                            <div style={{
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              background: 'rgba(244, 63, 94, 0.08)',
+                              border: '1px solid rgba(244, 63, 94, 0.25)',
+                              fontSize: '0.78rem'
+                            }}>
+                              <div style={{ color: 'var(--accent-rose)', fontWeight: 700, marginBottom: '4px' }}>
+                                {a.terminationReason || 'Порушення правил прокторингу'}
+                              </div>
+                              {a.violations && a.violations.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  {a.violations.map(v => (
+                                    <div key={v.id} style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                      • {v.description} ({new Date(v.timestamp).toLocaleTimeString('uk-UA')})
                                     </div>
-                                  )}
+                                  ))}
                                 </div>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Порушень не зафіксовано</span>
                               )}
-                            </td>
-                            <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-primary)', fontSize: '0.78rem' }}>
-                                <Clock size={12} color="var(--text-muted)" />
-                                {a.startedAt ? new Date(a.startedAt).toLocaleString('uk-UA') : a.date}
-                              </div>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                Завершено: {a.completedAt ? new Date(a.completedAt).toLocaleTimeString('uk-UA') : '-'} (тривалість: {Math.floor(a.durationSeconds / 60)}хв {a.durationSeconds % 60}с)
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
+                            </div>
+                          )}
+
+                          {/* Timestamp footer */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '6px' }}>
+                            <Clock size={12} />
+                            <span>Дата: {a.startedAt ? new Date(a.startedAt).toLocaleDateString('uk-UA') : a.date}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
         </div>
       )}
     </div>

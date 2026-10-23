@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { EdkiProvider, useEdki } from './context/EdkiContext';
 import { Navbar, TabType } from './components/Navbar';
@@ -18,7 +18,7 @@ import { EDKI_CLUSTERS_DATA } from './data/clusters';
 
 const MainAppContent: React.FC = () => {
   const { questions, mistakes, generateBalancedExamQuestions } = useEdki();
-  const { isTeacher, isAdmin, isLoggedIn } = useAuth();
+  const { isTeacher, isAdmin, isLoggedIn, currentUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | undefined>(undefined);
@@ -39,9 +39,46 @@ const MainAppContent: React.FC = () => {
     title: ''
   });
 
+  const handleExitQuiz = () => {
+    setActiveQuiz({
+      isActive: false,
+      questions: [],
+      mode: 'learning',
+      title: ''
+    });
+  };
+
+  const handleLoginSuccess = () => {
+    setActiveTab('dashboard');
+    handleExitQuiz();
+  };
+
+  // Reset to dashboard and exit any active quiz whenever user logs in or switches
+  useEffect(() => {
+    if (isLoggedIn) {
+      setActiveTab('dashboard');
+      handleExitQuiz();
+    }
+  }, [isLoggedIn, currentUser?.id]);
+
+  // Validate tab permissions and fallback to dashboard if unauthorized
+  const isTabAllowed = (tab: TabType): boolean => {
+    if (tab === 'admin_panel') return Boolean(isAdmin);
+    if (tab === 'teacher') return Boolean(isTeacher || isAdmin);
+    return ['dashboard', 'clusters', 'training', 'simulation', 'catalog', 'mistakes', 'sources'].includes(tab);
+  };
+
+  const effectiveTab: TabType = isTabAllowed(activeTab) ? activeTab : 'dashboard';
+
+  useEffect(() => {
+    if (!isTabAllowed(activeTab)) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isAdmin, isTeacher]);
+
   // Standard login / registration screen when not logged in
   if (!isLoggedIn) {
-    return <LoginPage onLoginSuccess={() => {}} />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
 
@@ -149,19 +186,11 @@ const MainAppContent: React.FC = () => {
     });
   };
 
-  const handleExitQuiz = () => {
-    setActiveQuiz({
-      isActive: false,
-      questions: [],
-      mode: 'learning',
-      title: ''
-    });
-  };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <Navbar 
-        activeTab={activeTab} 
+        activeTab={effectiveTab} 
         setActiveTab={(tab) => {
           setActiveTab(tab);
           if (activeQuiz.isActive) {
@@ -184,7 +213,7 @@ const MainAppContent: React.FC = () => {
           />
         ) : (
           <>
-            {activeTab === 'dashboard' && (
+            {effectiveTab === 'dashboard' && (
               <Dashboard
                 onStartExam={handleStartExam}
                 onStartTopicDrill={handleStartTopicDrill}
@@ -195,18 +224,18 @@ const MainAppContent: React.FC = () => {
               />
             )}
 
-            {activeTab === 'clusters' && (
+            {effectiveTab === 'clusters' && (
               <ClustersView onStartClusterDrill={handleStartClusterDrill} />
             )}
 
-            {activeTab === 'training' && (
+            {effectiveTab === 'training' && (
               <TrainingSetup
                 preselectedSubjectId={selectedSubjectId}
                 onStartQuiz={(qs, mode, title, subId) => handleStartCustomQuiz(qs, title, mode, subId)}
               />
             )}
 
-            {activeTab === 'simulation' && (
+            {effectiveTab === 'simulation' && (
               <div className="glass-card" style={{ padding: 'clamp(18px, 4vw, 36px)', textAlign: 'center', maxWidth: '750px', margin: '0 auto' }}>
                 <h2 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.8rem)', marginBottom: '12px' }}>
                   Офіційна симуляція ЄДКІ: 125 «Кібербезпека»
@@ -231,29 +260,29 @@ const MainAppContent: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'catalog' && (
+            {effectiveTab === 'catalog' && (
               <SubjectCatalog onStartSubjectDrill={handleStartTopicDrill} />
             )}
 
-            {activeTab === 'mistakes' && (
+            {effectiveTab === 'mistakes' && (
               <MistakesBank onStartMistakesDrill={handleStartMistakesDrill} />
             )}
 
 
 
-            {activeTab === 'sources' && (
+            {effectiveTab === 'sources' && (
               <SourcesLibrary />
             )}
 
             {/* TEACHER DASHBOARD */}
-            {activeTab === 'teacher' && (isTeacher || isAdmin) && (
+            {effectiveTab === 'teacher' && (isTeacher || isAdmin) && (
               <TeacherDashboard 
                 onNavigateTab={(t) => setActiveTab(t)}
               />
             )}
 
             {/* ADMIN PANEL */}
-            {activeTab === 'admin_panel' && isAdmin && (
+            {effectiveTab === 'admin_panel' && isAdmin && (
               <AdminPanel />
             )}
           </>

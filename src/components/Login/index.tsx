@@ -314,6 +314,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         margin: '16px auto',
         padding: '0 12px',
         zIndex: 10,
+        boxSizing: 'border-box',
         transition: 'max-width 0.25s ease'
       }}>
         {/* Logo / Header with framed shield */}

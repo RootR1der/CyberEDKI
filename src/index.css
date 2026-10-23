@@ -478,7 +478,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 4px 2px;
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -488,7 +488,9 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-sm);
   transition: all 0.2s ease;
   position: relative;
-  min-width: 52px;
+  flex: 1;
+  min-width: 0;
+  max-width: 68px;
   -webkit-tap-highlight-color: transparent;
 }
 

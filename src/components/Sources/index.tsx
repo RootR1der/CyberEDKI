@@ -118,27 +118,29 @@ export const SourcesLibrary: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header bar */}
       <div className="glass-card" style={{
-        padding: '28px 32px',
+        padding: 'clamp(16px, 4vw, 28px) clamp(14px, 4vw, 24px)',
         background: 'linear-gradient(135deg, rgba(14, 21, 38, 0.9) 0%, rgba(20, 35, 60, 0.7) 100%)',
-        border: '1px solid rgba(6, 182, 212, 0.25)'
+        border: '1px solid rgba(6, 182, 212, 0.25)',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <BookOpen size={28} color="var(--accent-cyan)" />
-          <h2 style={{ fontSize: '1.6rem' }}>Офіційні джерела та стандарти програми ЄДКІ</h2>
+          <BookOpen size={28} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
+          <h2 style={{ fontSize: 'clamp(1.2rem, 4vw, 1.6rem)' }}>Офіційні джерела та стандарти програми ЄДКІ</h2>
         </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.94rem', maxWidth: '750px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', maxWidth: '750px', lineHeight: 1.55 }}>
           Нормативно-правова база України, стандарти ISO/IEC, керівництва NIST, технічні специфікації RFC та галузеві фреймворки (OWASP, MITRE ATT&CK), на яких базуються тестові завдання ЄДКІ зі спеціальності 125 «Кібербезпека».
         </p>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="glass-card" style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', maxWidth: '100%' }}>
+      <div className="glass-card" style={{ padding: 'clamp(12px, 3vw, 16px) clamp(12px, 3vw, 20px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', maxWidth: '100%', width: '100%', WebkitOverflowScrolling: 'touch', paddingBottom: '4px' }}>
           {categories.map(cat => (
             <button
               key={cat}
               className={`btn ${selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '6px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+              style={{ padding: '6px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap', flexShrink: 0 }}
               onClick={() => setSelectedCategory(cat)}
             >
               {cat === 'all' ? 'Усі джерела' : cat}
@@ -146,8 +148,8 @@ export const SourcesLibrary: React.FC = () => {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', minWidth: '240px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 'min(100%, 220px)' }}>
             <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -162,7 +164,8 @@ export const SourcesLibrary: React.FC = () => {
                 color: '#ffffff',
                 padding: '8px 12px 8px 32px',
                 fontSize: '0.84rem',
-                outline: 'none'
+                outline: 'none',
+                boxSizing: 'border-box'
               }}
             />
           </div>

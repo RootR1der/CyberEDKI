@@ -63,22 +63,16 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
   const disqualifiedRef = useRef(false);
   const [terminationReason, setTerminationReason] = useState<string>('');
 
-  // Shuffle options for each question so correct answer isn't always in the same position
+  // Ensure options for all test questions strictly start in alphabetical order A, B, C, D
   const shuffledQuestions = useMemo(() => {
     if (!Array.isArray(questions)) return [];
     return questions
       .filter((q): q is Question => Boolean(q && typeof q === 'object' && Array.isArray(q.options) && q.options.length >= 2))
       .map((q, idx) => {
         const qId = q.id || `q-${idx}-${Date.now()}`;
-        const shuffled = [...q.options];
-        // Fisher-Yates shuffle with seed from question id for consistency
-        let seed = qId.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          seed = (seed * 16807 + 0) % 2147483647;
-          const j = seed % (i + 1);
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        return { ...q, id: qId, options: shuffled };
+        // Options must strictly start in order A, B, C, D
+        const sortedOptions = [...q.options].sort((a, b) => a.id.localeCompare(b.id));
+        return { ...q, id: qId, options: sortedOptions };
       });
   }, [questions]);
 
@@ -354,35 +348,37 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
     });
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1000px', margin: '0 auto', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
         {/* Score Card */}
         <div className="glass-card" style={{
-          padding: 'clamp(18px, 4vw, 36px)',
+          padding: 'clamp(16px, 4vw, 32px)',
           textAlign: 'center',
           border: completedAttempt.passed ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(244, 63, 94, 0.4)',
-          background: completedAttempt.passed ? 'rgba(16, 185, 129, 0.04)' : 'rgba(244, 63, 94, 0.04)'
+          background: completedAttempt.passed ? 'rgba(16, 185, 129, 0.04)' : 'rgba(244, 63, 94, 0.04)',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           <div style={{
-            width: '80px',
-            height: '80px',
+            width: 'clamp(64px, 15vw, 80px)',
+            height: 'clamp(64px, 15vw, 80px)',
             borderRadius: '50%',
             background: completedAttempt.passed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 16px auto'
+            margin: '0 auto 14px auto'
           }}>
             {completedAttempt.passed ? (
-              <Award size={42} color="var(--accent-emerald)" />
+              <Award size={38} color="var(--accent-emerald)" />
             ) : (
-              <AlertCircle size={42} color="var(--accent-rose)" />
+              <AlertCircle size={38} color="var(--accent-rose)" />
             )}
           </div>
 
-          <h2 style={{ fontSize: '1.8rem', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: 'clamp(1.3rem, 4.5vw, 1.8rem)', marginBottom: '8px', wordBreak: 'break-word' }}>
             {completedAttempt.passed ? 'ЄДКІ успішно складено!' : 'Тестування завершено'}
           </h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: 'clamp(0.85rem, 2.8vw, 0.95rem)', lineHeight: 1.5 }}>
             {completedAttempt.passed 
               ? 'Вітаємо! Ваш бал перевищує встановлений прохідний поріг 60%.' 
               : 'Результат нижче прохідного порогу 60%. Рекомендуємо опрацювати помилки нижче.'}
@@ -391,69 +387,69 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           <div style={{
             display: 'flex',
             justifyContent: 'center',
-            gap: '32px',
+            gap: 'clamp(16px, 4vw, 36px)',
             flexWrap: 'wrap',
-            padding: '20px 0',
+            padding: '16px 0',
             borderTop: '1px solid var(--border-subtle)',
             borderBottom: '1px solid var(--border-subtle)',
-            marginBottom: '24px'
+            marginBottom: '20px'
           }}>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>РЕЗУЛЬТАТ</div>
+            <div style={{ minWidth: '80px' }}>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>РЕЗУЛЬТАТ</div>
               <div style={{
-                fontSize: '2.4rem',
+                fontSize: 'clamp(1.8rem, 5vw, 2.4rem)',
                 fontWeight: 800,
                 color: completedAttempt.passed ? 'var(--accent-emerald)' : 'var(--accent-rose)'
               }}>
                 {completedAttempt.scorePercentage}%
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ПРАВИЛЬНО</div>
-              <div style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff' }}>
+            <div style={{ minWidth: '80px' }}>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>ПРАВИЛЬНО</div>
+              <div style={{ fontSize: 'clamp(1.8rem, 5vw, 2.4rem)', fontWeight: 800, color: '#ffffff' }}>
                 {completedAttempt.correctCount} / {completedAttempt.totalQuestions}
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ЧАС</div>
-              <div style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+            <div style={{ minWidth: '80px' }}>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>ЧАС</div>
+              <div style={{ fontSize: 'clamp(1.8rem, 5vw, 2.4rem)', fontWeight: 800, color: 'var(--accent-cyan)' }}>
                 {formatTime(completedAttempt.durationSeconds)}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '14px' }}>
-            <button className="btn btn-primary" onClick={onExit}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={onExit} style={{ minHeight: '40px', padding: '8px 20px' }}>
               До головного меню
             </button>
           </div>
         </div>
 
         {/* Detailed Question Review List */}
-        <div>
+        <div style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-            <h3 style={{ fontSize: '1.3rem' }}>
+            <h3 style={{ fontSize: 'clamp(1.05rem, 3.5vw, 1.3rem)' }}>
               Аналіз відповідей ({filteredReviewQuestions.length})
             </h3>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button
                 className={`btn ${reviewFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', minHeight: '34px' }}
                 onClick={() => setReviewFilter('all')}
               >
                 Всі питання
               </button>
               <button
                 className={`btn ${reviewFilter === 'incorrect' ? 'btn-danger' : 'btn-secondary'}`}
-                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', minHeight: '34px' }}
                 onClick={() => setReviewFilter('incorrect')}
               >
                 Лише помилки
               </button>
               <button
                 className={`btn ${reviewFilter === 'flagged' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', minHeight: '34px' }}
                 onClick={() => setReviewFilter('flagged')}
               >
                 Позначені
@@ -461,7 +457,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', minWidth: 0 }}>
             {filteredReviewQuestions.map((q, idx) => {
               const record = completedAttempt.answers.find(a => a.questionId === q.id);
               const isCorrect = record?.isCorrect;
@@ -472,22 +468,25 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                   key={q.id}
                   className="glass-card"
                   style={{
-                    padding: '24px',
-                    borderLeft: `5px solid ${isCorrect ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`
+                    padding: 'clamp(14px, 3.5vw, 22px)',
+                    borderLeft: `5px solid ${isCorrect ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`,
+                    width: '100%',
+                    minWidth: 0,
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                       <span className="mono-code" style={{ fontSize: '0.74rem' }}>{q.id}</span>
-                      <span className="badge badge-indigo" style={{ fontSize: '0.7rem' }}>
+                      <span className="badge badge-indigo" style={{ fontSize: '0.7rem', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         {sub?.name}
                       </span>
-                      <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>
+                      <span className="badge badge-cyan" style={{ fontSize: '0.7rem', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         {q.subtopic}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                       {isCorrect ? (
                         <span className="badge badge-emerald">Вірно</span>
                       ) : (
@@ -496,12 +495,18 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                     </div>
                   </div>
 
-                  <h4 style={{ fontSize: '1.05rem', lineHeight: 1.5, marginBottom: '16px' }}>
+                  <h4 style={{
+                    fontSize: 'clamp(0.95rem, 2.8vw, 1.05rem)',
+                    lineHeight: 1.5,
+                    marginBottom: '16px',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere'
+                  }}>
                     {idx + 1}. {q.text}
                   </h4>
 
                   {/* Options with markers */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', width: '100%', minWidth: 0 }}>
                     {q.options.map(opt => {
                       const isUserChoice = record?.selectedOption === opt.id;
                       const isRightChoice = q.correctAnswer === opt.id;
@@ -524,30 +529,39 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                         <div
                           key={opt.id}
                           style={{
-                            padding: '10px 14px',
+                            padding: '10px 12px',
                             borderRadius: 'var(--radius-md)',
                             background: optBg,
                             border: `1px solid ${optBorder}`,
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: 'flex-start',
                             justifyContent: 'space-between',
-                            fontSize: '0.9rem'
+                            fontSize: '0.88rem',
+                            flexWrap: 'wrap',
+                            gap: '8px',
+                            width: '100%',
+                            boxSizing: 'border-box'
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <strong style={{ minWidth: '20px', color: optColor }}>{opt.id}.</strong>
-                            <span>{opt.text}</span>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1, minWidth: 'min(100%, 220px)' }}>
+                            <strong style={{ minWidth: '18px', color: optColor, marginTop: '1px' }}>{opt.id}.</strong>
+                            <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{opt.text}</span>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
-                            {!isSimulation && isRightChoice && (
-                              <span style={{ color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <CheckCircle2 size={16} /> Правильна відповідь
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', flexShrink: 0, marginLeft: 'auto' }}>
+                            {isRightChoice && (
+                              <span style={{ color: 'var(--accent-emerald)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                                <CheckCircle2 size={15} /> Правильна відповідь
                               </span>
                             )}
-                            {!isSimulation && isUserChoice && !isRightChoice && (
-                              <span style={{ color: 'var(--accent-rose)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <XCircle size={16} /> Ваш вибір
+                            {isUserChoice && !isRightChoice && (
+                              <span style={{ color: 'var(--accent-rose)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                                <XCircle size={15} /> Ваш вибір
+                              </span>
+                            )}
+                            {isUserChoice && isRightChoice && (
+                              <span style={{ color: 'var(--accent-emerald)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', opacity: 0.9 }}>
+                                (Ваш вибір)
                               </span>
                             )}
                           </div>
@@ -558,15 +572,25 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
 
                   {/* Deep Pedagogical Explanation Block */}
                   <div style={{
-                    padding: '16px',
+                    padding: 'clamp(12px, 3vw, 16px)',
                     background: 'rgba(6, 182, 212, 0.04)',
                     border: '1px solid rgba(6, 182, 212, 0.2)',
-                    borderRadius: 'var(--radius-md)'
+                    borderRadius: 'var(--radius-md)',
+                    width: '100%',
+                    minWidth: 0,
+                    boxSizing: 'border-box'
                   }}>
                     <div style={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--accent-cyan-light)', marginBottom: '6px' }}>
                       Обґрунтування правильної відповіді:
                     </div>
-                    <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.6 }}>
+                    <p style={{
+                      fontSize: 'clamp(0.82rem, 2.6vw, 0.88rem)',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '12px',
+                      lineHeight: 1.6,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
+                    }}>
                       {q.explanation}
                     </p>
 
@@ -574,9 +598,9 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                     <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
                       Розбір дистракторів (чому інші варіанти не підходять):
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
                       {(['A', 'B', 'C', 'D'] as OptionKey[]).map(key => (
-                        <div key={key} style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <div key={key} style={{ fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.5 }}>
                           <strong style={{ color: key === q.correctAnswer ? 'var(--accent-emerald)' : '#94a3b8' }}>{key}: </strong>
                           {q.optionExplanations[key]}
                         </div>
@@ -591,16 +615,21 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                       paddingTop: '10px',
                       borderTop: '1px solid rgba(255, 255, 255, 0.06)',
                       fontSize: '0.78rem',
-                      color: 'var(--text-muted)'
+                      color: 'var(--text-muted)',
+                      flexWrap: 'wrap',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
                     }}>
-                      <BookOpen size={14} color="var(--accent-cyan)" />
-                      <span>Джерело: <strong style={{ color: '#ffffff' }}>{q.source.title}</strong> ({q.source.articleOrSection})</span>
+                      <BookOpen size={14} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
+                      <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        Джерело: <strong style={{ color: '#ffffff' }}>{q.source.title}</strong> ({q.source.articleOrSection})
+                      </span>
                       {q.source.url && (
                         <a 
                           href={q.source.url} 
                           target="_blank" 
                           rel="noreferrer"
-                          style={{ color: 'var(--accent-cyan)', display: 'inline-flex', alignItems: 'center', marginLeft: 'auto' }}
+                          style={{ color: 'var(--accent-cyan)', display: 'inline-flex', alignItems: 'center', marginLeft: 'auto', padding: '4px' }}
                         >
                           <ExternalLink size={13} />
                         </a>

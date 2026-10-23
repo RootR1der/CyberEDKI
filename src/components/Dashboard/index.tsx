@@ -336,7 +336,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '14px', width: '100%', minWidth: 0 }}>
             {analytics.weakTopics.map((wt, idx) => (
               <div 
                 key={idx}

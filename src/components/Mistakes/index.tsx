@@ -163,9 +163,15 @@ export const MistakesBank: React.FC<MistakesBankProps> = ({ onStartMistakesDrill
                   {question.text}
                 </h3>
 
-                {/* Options preview */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px', marginBottom: '18px' }}>
-                  {question.options.map(opt => (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
+                  gap: '8px',
+                  marginBottom: '18px',
+                  width: '100%',
+                  minWidth: 0
+                }}>
+                  {[...question.options].sort((a, b) => a.id.localeCompare(b.id)).map(opt => (
                     <div 
                       key={opt.id}
                       style={{
