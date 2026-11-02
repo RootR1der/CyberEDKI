@@ -657,7 +657,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 110, padding: '20px'
         }}>
-          <form onSubmit={handleBulkAdd} className="glass-card" style={{ maxWidth: '520px', width: '100%', padding: '28px' }}>
+          <form onSubmit={handleBulkAdd} className="glass-card modal-dialog-responsive" style={{ maxWidth: '520px', width: '100%', padding: 'clamp(14px, 3.5vw, 24px)', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '12px' }}>Груповий імпорт студентів списком</h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
               Вставте ПІБ студентів (кожен студент з нового рядка):

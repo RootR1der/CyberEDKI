@@ -9,16 +9,15 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  RotateCcw,
+  AlertTriangle,
   BookOpen,
   ArrowRight,
   ExternalLink,
   Award,
-  BarChart3,
   HelpCircle,
   X
 } from 'lucide-react';
-import { Question, OptionKey, TestMode, TestAttempt, QuestionAnswerRecord, ViolationType, ProctoringViolation } from '../../types/edki';
+import { Question, OptionKey, TestMode, TestAttempt, QuestionAnswerRecord, ProctoringViolation } from '../../types/edki';
 import { useEdki } from '../../context/EdkiContext';
 import { SUBJECTS_DATA } from '../../data/subjects';
 
@@ -62,6 +61,12 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
   const [proctoringViolations, setProctoringViolations] = useState<ProctoringViolation[]>([]);
   const disqualifiedRef = useRef(false);
   const [terminationReason, setTerminationReason] = useState<string>('');
+  const blurStrikesRef = useRef(0);
+  const [mobileWarning, setMobileWarning] = useState<{ show: boolean; strikes: number; maxStrikes: number }>({
+    show: false,
+    strikes: 0,
+    maxStrikes: 3
+  });
 
   // Ensure options for all test questions strictly start in alphabetical order A, B, C, D
   const shuffledQuestions = useMemo(() => {
@@ -69,7 +74,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
     return questions
       .filter((q): q is Question => Boolean(q && typeof q === 'object' && Array.isArray(q.options) && q.options.length >= 2))
       .map((q, idx) => {
-        const qId = q.id || `q-${idx}-${Date.now()}`;
+        const qId = q.id || `q-${idx}`;
         // Options must strictly start in order A, B, C, D
         const sortedOptions = [...q.options].sort((a, b) => a.id.localeCompare(b.id));
         return { ...q, id: qId, options: sortedOptions };
@@ -88,6 +93,9 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
   useEffect(() => { flaggedQuestionsRef.current = flaggedQuestions; }, [flaggedQuestions]);
   useEffect(() => { timeRemainingRef.current = timeRemaining; }, [timeRemaining]);
 
+  const finishExamRef = useRef<() => void>(() => {});
+  const disqualifyRef = useRef<(reason: string, violation: ProctoringViolation) => void>(() => {});
+
   // Countdown timer for simulation
   useEffect(() => {
     if (isSimulation && !isCompleted) {
@@ -95,7 +103,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
         setTimeRemaining(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            finishExam();
+            finishExamRef.current();
             return 0;
           }
           return prev - 1;
@@ -151,9 +159,18 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
     setIsCompleted(true);
   };
 
+  useEffect(() => {
+    disqualifyRef.current = disqualifyTestImmediate;
+  });
+
   // Attach proctoring listeners for simulation mode only
   useEffect(() => {
     if (!isSimulation || isCompleted) return;
+
+    const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    const isFullscreenSupported = typeof document !== 'undefined' && Boolean(
+      document.fullscreenEnabled || ('webkitFullscreenEnabled' in document && (document as unknown as { webkitFullscreenEnabled: boolean }).webkitFullscreenEnabled)
+    );
 
     const onVisibilityChange = () => {
       if (document.hidden && !disqualifiedRef.current) {
@@ -163,23 +180,47 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           description: 'Перехід на іншу вкладку або згортання браузера',
           timestamp: new Date().toISOString(),
         };
-        disqualifyTestImmediate(v.description, v);
+        disqualifyRef.current(v.description, v);
       }
     };
 
     const onBlur = () => {
-      if (!disqualifiedRef.current) {
+      if (disqualifiedRef.current) return;
+
+      if (isTouchDevice) {
+        blurStrikesRef.current += 1;
+        const currentStrikes = blurStrikesRef.current;
+        const v: ProctoringViolation = {
+          id: `${Date.now()}-blur`,
+          type: 'blur',
+          description: `Втрата фокуса вікна браузера на телефоні (попередження ${currentStrikes}/3)`,
+          timestamp: new Date().toISOString(),
+        };
+        proctoringViolationsRef.current.push(v);
+        setProctoringViolations([...proctoringViolationsRef.current]);
+
+        if (currentStrikes >= 3) {
+          disqualifyRef.current('Вичерпано 3 попередження про втрату фокусу вікна на мобільному пристрої', v);
+        } else {
+          setMobileWarning({
+            show: true,
+            strikes: currentStrikes,
+            maxStrikes: 3
+          });
+        }
+      } else {
         const v: ProctoringViolation = {
           id: `${Date.now()}-blur`,
           type: 'blur',
           description: 'Втрата фокуса вікна браузера',
           timestamp: new Date().toISOString(),
         };
-        disqualifyTestImmediate(v.description, v);
+        disqualifyRef.current(v.description, v);
       }
     };
 
     const onFullscreenChange = () => {
+      if (!isFullscreenSupported) return;
       if (!document.fullscreenElement && !disqualifiedRef.current) {
         const v: ProctoringViolation = {
           id: `${Date.now()}-fullscreen_exit`,
@@ -187,12 +228,29 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           description: 'Вихід з повноекранного режиму',
           timestamp: new Date().toISOString(),
         };
-        disqualifyTestImmediate(v.description, v);
+        disqualifyRef.current(v.description, v);
       }
     };
 
     const onResize = () => {
       if (disqualifiedRef.current) return;
+
+      // On touch devices, virtual keyboard and dynamic address bar change window height.
+      // We ignore height changes on touch devices, and only verify width against split screen.
+      if (isTouchDevice) {
+        const widthThreshold = 0.7;
+        if (window.innerWidth < screen.availWidth * widthThreshold) {
+          const v: ProctoringViolation = {
+            id: `${Date.now()}-split_screen`,
+            type: 'split_screen',
+            description: 'Виявлено розділення екрану (Split View)',
+            timestamp: new Date().toISOString(),
+          };
+          disqualifyRef.current(v.description, v);
+        }
+        return;
+      }
+
       const threshold = 0.8;
       if (
         window.innerWidth < screen.availWidth * threshold ||
@@ -204,19 +262,23 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           description: 'Виявлено розділення екрану або зменшення робочої області',
           timestamp: new Date().toISOString(),
         };
-        disqualifyTestImmediate(v.description, v);
+        disqualifyRef.current(v.description, v);
       }
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('blur', onBlur);
-    document.addEventListener('fullscreenchange', onFullscreenChange);
+    if (isFullscreenSupported) {
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+    }
     window.addEventListener('resize', onResize);
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', onBlur);
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      if (isFullscreenSupported) {
+        document.removeEventListener('fullscreenchange', onFullscreenChange);
+      }
       window.removeEventListener('resize', onResize);
     };
   }, [isSimulation, isCompleted]);
@@ -231,7 +293,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
       setShowLearningFeedback(false);
     }
     setShowErrorPopup(false);
-  }, [currentIndex, shuffledQuestions]);
+  }, [currentIndex, shuffledQuestions, selectedAnswers]);
 
   const handleSelectOption = (optionKey: OptionKey) => {
     if (isCompleted) return;
@@ -308,9 +370,15 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           spread: 70,
           origin: { y: 0.6 }
         });
-      } catch (e) {}
+      } catch {
+        // confetti optional
+      }
     }
   };
+
+  useEffect(() => {
+    finishExamRef.current = finishExam;
+  });
 
   // Format timer HH:MM:SS or MM:SS
   const formatTime = (secs: number) => {
@@ -1089,7 +1157,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
               {/* Widget Body */}
               <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {/* Comparison block: User Choice vs Correct Answer */}
-                <div style={{ display: 'grid', gridTemplateColumns: isAnswerWrong ? 'repeat(auto-fit, minmax(260px, 1fr))' : '1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isAnswerWrong ? 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' : '1fr', gap: '12px' }}>
                   {isAnswerWrong && (
                     <div style={{
                       padding: '12px 14px',
@@ -1279,7 +1347,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           zIndex: 100,
           padding: '20px'
         }}>
-          <div className="glass-card" style={{ maxWidth: '420px', padding: '28px', textAlign: 'center' }}>
+          <div className="glass-card modal-dialog-responsive" style={{ maxWidth: '420px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 'clamp(14px, 3.5vw, 24px)', textAlign: 'center' }}>
             <AlertCircle size={40} color="var(--accent-rose)" style={{ marginBottom: '14px' }} />
             <h3 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>Завершити тестування?</h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '22px' }}>
@@ -1293,6 +1361,75 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                 Вийти
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE PROCTORING WARNING STRIKES MODAL */}
+      {isSimulation && mobileWarning.show && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 110,
+          padding: '20px'
+        }}>
+          <div className="glass-card modal-dialog-responsive" style={{
+            maxWidth: '440px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: 'clamp(16px, 3.5vw, 24px)',
+            textAlign: 'center',
+            border: '2px solid rgba(245, 158, 11, 0.5)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(245, 158, 11, 0.2)'
+          }}>
+            <div style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: 'rgba(245, 158, 11, 0.15)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 14px auto',
+              color: 'var(--accent-amber)'
+            }}>
+              <AlertTriangle size={28} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '8px', color: '#fbbf24' }}>
+              Попередження прокторингу!
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.45 }}>
+              Виявлено втрату фокуса вікна браузера на телефоні. Спроба <strong>{mobileWarning.strikes}</strong> з <strong>{mobileWarning.maxStrikes}</strong>.
+            </p>
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              fontSize: '0.8rem',
+              color: '#fef3c7',
+              marginBottom: '20px',
+              textAlign: 'left'
+            }}>
+              Увага: після 3-го попередження тест ЄДКІ буде автоматично зупинено та дискваліфіковано. Будь ласка, залишайтеся у вкладці тестування.
+            </div>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+              onClick={() => setMobileWarning(prev => ({ ...prev, show: false }))}
+            >
+              Зрозуміло, повернутися до тесту
+            </button>
           </div>
         </div>
       )}
@@ -1316,7 +1453,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
             zIndex: 150,
             padding: '20px'
           }}>
-            <div className="glass-card" style={{
+            <div className="glass-card modal-dialog-responsive" style={{
               width: '100%',
               maxWidth: '740px',
               maxHeight: '90vh',
@@ -1324,7 +1461,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
               background: 'linear-gradient(180deg, #111827 0%, #0b0f19 100%)',
               border: '2px solid rgba(244, 63, 94, 0.5)',
               borderRadius: '24px',
-              padding: '28px',
+              padding: 'clamp(14px, 3.5vw, 24px)',
               boxShadow: '0 25px 70px rgba(0, 0, 0, 0.85), 0 0 45px rgba(244, 63, 94, 0.25)',
               display: 'flex',
               flexDirection: 'column',

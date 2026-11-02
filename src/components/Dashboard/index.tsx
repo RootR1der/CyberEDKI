@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ShieldCheck,
   AlertTriangle,
   Zap,
   GraduationCap,
@@ -9,15 +8,12 @@ import {
   TrendingUp,
   Target,
   ArrowRight,
-  BookMarked,
   CheckCircle,
   XCircle,
-  Layers,
-  Award
+  Layers
 } from 'lucide-react';
 import { useEdki } from '../../context/EdkiContext';
 import { useAuth } from '../../context/AuthContext';
-import { SUBJECTS_DATA } from '../../data/subjects';
 import { EDKI_CLUSTERS_DATA } from '../../data/clusters';
 
 interface DashboardProps {
@@ -125,7 +121,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span>7 Кластерів ЄДКІ</span>
             </button>
 
-            {activeMistakesCount > 0 && (
+            {activeMistakesCount > 0 ? (
               <button 
                 className="btn btn-danger"
                 onClick={onStartMistakesDrill}
@@ -133,6 +129,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               >
                 <RotateCcw size={18} />
                 <span>Опрацювати помилки ({activeMistakesCount})</span>
+              </button>
+            ) : (
+              <button 
+                className="btn btn-secondary"
+                onClick={() => onNavigateTab('mistakes')}
+                style={{ fontSize: '0.96rem', padding: '12px 18px' }}
+              >
+                <RotateCcw size={18} color="var(--accent-cyan)" />
+                <span>Банк помилок (0)</span>
               </button>
             )}
 
@@ -268,7 +273,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '14px' }}>
           {EDKI_CLUSTERS_DATA.map(cl => {
             const mastery = analytics.clusterMastery[cl.id] || { answered: 0, accuracy: 0 };
             const qCount = questions.filter(q => q.clusterId === cl.id).length;

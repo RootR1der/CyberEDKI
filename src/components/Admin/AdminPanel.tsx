@@ -465,7 +465,7 @@ export const AdminPanel: React.FC = () => {
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
               {academicGroups.map(grp => {
                 const studentCount = allUsers.filter(u => u.role === 'student' && u.groupName === grp.name).length;
 
@@ -821,9 +821,10 @@ export const AdminPanel: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
                   gap: '12px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px', minWidth: 0 }}>
                     <div style={{
                       width: '42px', height: '42px', borderRadius: '50%',
                       background: 'rgba(0,212,255,0.2)', border: '1px solid rgba(0,212,255,0.5)',
@@ -832,11 +833,11 @@ export const AdminPanel: React.FC = () => {
                     }}>
                       {selectedResetUser.firstName?.[0] || selectedResetUser.name?.[0] || '?'}
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                         {selectedResetUser.name}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
                         Логін: <strong>@{selectedResetUser.username}</strong> · {selectedResetUser.email}
                       </div>
                       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -850,8 +851,8 @@ export const AdminPanel: React.FC = () => {
                     onClick={() => setResetUserId('')}
                     style={{
                       background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'var(--text-muted)', padding: '6px 10px', borderRadius: '6px',
-                      cursor: 'pointer', fontSize: '0.76rem'
+                      color: 'var(--text-muted)', padding: '6px 12px', borderRadius: '6px',
+                      cursor: 'pointer', fontSize: '0.78rem', minHeight: '38px', flexShrink: 0
                     }}
                   >
                     Змінити вибір

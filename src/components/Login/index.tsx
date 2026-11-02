@@ -46,7 +46,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState(() => academicGroups[0]?.id || '');
+  const [selectedGroupId, setSelectedGroupId] = useState(() => academicGroups[0]?.id || 'grp-kb-41');
 
   // ── Password recovery state ────────────────────────────────────────────────
   const [forgotIdentifier, setForgotIdentifier] = useState('');
@@ -74,7 +74,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   // Set default group when academicGroups load
   useEffect(() => {
-    if (!selectedGroupId && academicGroups.length > 0) {
+    if ((!selectedGroupId || !academicGroups.some(g => g.id === selectedGroupId)) && academicGroups.length > 0) {
       setSelectedGroupId(academicGroups[0].id);
     }
   }, [academicGroups, selectedGroupId]);
@@ -114,7 +114,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setError('');
     await new Promise(resolve => setTimeout(resolve, 400));
 
-    const result = login(username, password);
+    const result = await login(username, password);
     setIsLoading(false);
 
     if (result.success) {
@@ -127,11 +127,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   // ── Handle Registration ────────────────────────────────────────────────────
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const group = academicGroups.find(g => g.id === selectedGroupId);
-    if (!group) {
-      setError('Будь ласка, оберіть академічну групу');
-      return;
-    }
+    const group = academicGroups.find(g => g.id === selectedGroupId) || academicGroups[0];
+    const groupName = group ? group.name : 'КБ-41';
     if (!regFirstName.trim() || !regLastName.trim()) {
       setError('Введіть прізвище та ім\'я');
       return;
@@ -167,10 +164,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setError('');
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const result = registerStudent({
+    const result = await registerStudent({
       firstName: regFirstName.trim(),
       lastName: regLastName.trim(),
-      groupName: group.name,
+      groupName: groupName,
       email: cleanEmail,
       username: cleanUsername,
       password: regPassword

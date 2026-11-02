@@ -479,6 +479,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   gap: 2px;
   padding: 4px 2px;
+  min-height: 44px;
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -587,6 +588,31 @@ h1, h2, h3, h4, h5, h6 {
   input,
   a {
     touch-action: manipulation;
+  }
+}
+
+/* Catalog mobile optimization */
+@media (max-width: 640px) {
+  .catalog-subject-actions {
+    width: 100% !important;
+    margin-left: 0 !important;
+    justify-content: space-between !important;
+    padding-top: 10px !important;
+    margin-top: 4px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  }
+  .catalog-subject-actions .btn-primary {
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+  .catalog-topic-actions {
+    width: 100% !important;
+    justify-content: flex-end !important;
+    margin-top: 4px !important;
+    gap: 6px !important;
+  }
+  .catalog-topic-actions button {
+    min-height: 36px !important;
   }
 }
 

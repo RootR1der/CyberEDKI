@@ -216,7 +216,7 @@ export const TrainingSetup: React.FC<TrainingSetupProps> = ({ onStartQuiz, prese
           <button
             className="btn btn-primary"
             onClick={handleLaunch}
-            style={{ padding: '12px 28px', fontSize: '1rem' }}
+            style={{ padding: '12px 28px', fontSize: '1rem', flex: '1 1 min(100%, 240px)', justifyContent: 'center' }}
           >
             <Play size={18} />
             <span>Розпочати тестування</span>

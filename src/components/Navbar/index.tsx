@@ -13,8 +13,7 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
-  Sparkles
+  ChevronRight
 } from 'lucide-react';
 import { useEdki } from '../../context/EdkiContext';
 import { useAuth } from '../../context/AuthContext';
@@ -37,7 +36,7 @@ interface NavbarProps {
   isQuizActive?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStartExam, isQuizActive = false }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStartExam: _onStartExam, isQuizActive = false }) => {
   const { analytics, mistakes } = useEdki();
   const { isTeacher, isAdmin, isStudent, currentUser, logout } = useAuth();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -305,8 +304,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStart
               onClick={() => setIsDrawerOpen(v => !v)}
               aria-label="Меню"
               style={{
-                width: '40px',
-                height: '40px',
+                width: '44px',
+                height: '44px',
+                minWidth: '44px',
+                minHeight: '44px',
                 borderRadius: '10px',
                 background: isDrawerOpen ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.06)',
                 border: `1px solid ${isDrawerOpen ? 'var(--accent-cyan)' : 'var(--border-subtle)'}`,
@@ -349,8 +350,10 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStart
                   border: '1px solid var(--border-subtle)',
                   borderRadius: '8px',
                   color: 'var(--text-muted)',
-                  width: '34px',
-                  height: '34px',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -497,7 +500,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStart
                 onClick={() => handleTabClick('mistakes')}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <AlertOctagon size={18} color={activeMistakesCount > 0 ? '#fb7185' : 'var(--text-muted)'} />
+                  <AlertOctagon size={18} color={activeTab === 'mistakes' ? 'var(--accent-cyan)' : activeMistakesCount > 0 ? '#fb7185' : 'var(--accent-rose)'} />
                   <span>Мої помилки</span>
                 </div>
                 {activeMistakesCount > 0 ? (
@@ -513,7 +516,16 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStart
                     {activeMistakesCount}
                   </span>
                 ) : (
-                  <ChevronRight size={16} color="var(--text-muted)" />
+                  <span style={{
+                    fontSize: '0.7rem',
+                    color: 'var(--accent-emerald)',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    padding: '1px 6px',
+                    borderRadius: '6px'
+                  }}>
+                    0
+                  </span>
                 )}
               </button>
 
@@ -631,13 +643,19 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onStart
           <button
             className={`mobile-dock-btn ${activeTab === 'mistakes' ? 'active' : ''}`}
             onClick={() => handleTabClick('mistakes')}
+            aria-label="Помилки"
           >
             <div className="dock-icon-box">
-              <AlertOctagon size={18} color={activeMistakesCount > 0 ? '#fb7185' : 'inherit'} />
+              <AlertOctagon 
+                size={18} 
+                color={activeTab === 'mistakes' ? 'var(--accent-cyan)' : activeMistakesCount > 0 ? '#fb7185' : 'var(--text-secondary)'} 
+              />
             </div>
             <span>Помилки</span>
-            {activeMistakesCount > 0 && (
+            {activeMistakesCount > 0 ? (
               <span className="mobile-dock-badge">{activeMistakesCount}</span>
+            ) : (
+              <span className="mobile-dock-badge" style={{ background: 'rgba(16, 185, 129, 0.25)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)' }}>0</span>
             )}
           </button>
 

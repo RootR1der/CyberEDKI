@@ -673,7 +673,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="catalog-subject-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: 'auto' }} onClick={e => e.stopPropagation()}>
                   <div style={{ textAlign: 'right', marginRight: '4px' }}>
                     <div style={{ fontSize: '0.88rem', fontWeight: 700, color: mastery.answered > 0 ? 'var(--accent-emerald)' : 'var(--text-muted)' }}>
                       {mastery.answered > 0 ? `${mastery.accuracy}%` : '—'}
@@ -765,25 +765,26 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                         <div 
                           key={topic.id}
                           style={{
-                            padding: '16px 18px',
+                            padding: 'clamp(10px, 3vw, 16px)',
                             borderRadius: 'var(--radius-md)',
                             background: 'rgba(255, 255, 255, 0.02)',
                             border: isQuestionsExpanded ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid var(--border-subtle)',
                             boxShadow: isQuestionsExpanded ? '0 4px 20px rgba(0,0,0,0.25)' : 'none',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            boxSizing: 'border-box'
                           }}
                         >
                           {/* Topic Top Row */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0, flex: 1 }}>
                               <span className="mono-code" style={{ fontSize: '0.74rem' }}>{topic.id}</span>
-                              <strong style={{ fontSize: '0.96rem', color: '#ffffff' }}>{topic.name}</strong>
+                              <strong style={{ fontSize: '0.96rem', color: '#ffffff', wordBreak: 'break-word' }}>{topic.name}</strong>
                               {!topic.isOfficial && (
                                 <span className="badge badge-indigo" style={{ fontSize: '0.62rem' }}>Додатково</span>
                               )}
                             </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <div className="catalog-topic-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               {/* Toggle Questions Expand Button */}
                               <button
                                 className="btn btn-secondary"
@@ -810,7 +811,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                                     title={`Додати нове тестове питання до теми «${topic.name}»`}
                                   >
                                     <Plus size={13} />
-                                    <span>Додати питання</span>
+                                    <span className="desktop-only">Додати питання</span>
                                   </button>
 
                                   <button
@@ -820,7 +821,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                                     title={`Імпортувати запитання безпосередньо у тему «${topic.name}»`}
                                   >
                                     <Upload size={12} color="var(--accent-cyan)" />
-                                    <span>Імпорт</span>
+                                    <span className="desktop-only">Імпорт</span>
                                   </button>
 
                                   <button
@@ -830,7 +831,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                                     title="Редагувати тему та підтеми"
                                   >
                                     <Edit3 size={12} color="var(--accent-cyan)" />
-                                    <span>Редагувати</span>
+                                    <span className="desktop-only">Редагувати</span>
                                   </button>
 
                                   <button
@@ -1526,15 +1527,15 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
           zIndex: 110,
           padding: '20px'
         }}>
-          <div className="glass-card" style={{
+          <div className="glass-card modal-dialog-responsive" style={{
             width: '100%',
             maxWidth: '780px',
-            maxHeight: '92vh',
+            maxHeight: '90vh',
             overflowY: 'auto',
             background: 'var(--bg-card)',
             border: '1px solid var(--border-glow)',
             borderRadius: 'var(--radius-lg)',
-            padding: '28px',
+            padding: 'clamp(14px, 3.5vw, 24px)',
             boxShadow: '0 25px 60px rgba(0,0,0,0.7)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -1915,7 +1916,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
           zIndex: 110,
           padding: '20px'
         }}>
-          <div className="glass-card" style={{
+          <div className="glass-card modal-dialog-responsive" style={{
             width: '100%',
             maxWidth: '680px',
             maxHeight: '90vh',
@@ -1923,7 +1924,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
             background: 'var(--bg-card)',
             border: '1px solid var(--border-glow)',
             borderRadius: 'var(--radius-lg)',
-            padding: '28px',
+            padding: 'clamp(14px, 3.5vw, 24px)',
             boxShadow: '0 25px 60px rgba(0,0,0,0.7)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -2159,13 +2160,15 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
           zIndex: 100,
           padding: '20px'
         }}>
-          <div className="glass-card" style={{
+          <div className="glass-card modal-dialog-responsive" style={{
             width: '100%',
             maxWidth: '560px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             background: 'var(--bg-card)',
             border: '1px solid var(--border-glow)',
             borderRadius: 'var(--radius-lg)',
-            padding: '28px',
+            padding: 'clamp(14px, 3.5vw, 24px)',
             boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

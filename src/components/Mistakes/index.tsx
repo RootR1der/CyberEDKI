@@ -4,10 +4,7 @@ import {
   RotateCcw,
   CheckCircle2,
   BookOpen,
-  ExternalLink,
-  Sparkles,
-  Flame,
-  Check
+  ExternalLink
 } from 'lucide-react';
 import { useEdki } from '../../context/EdkiContext';
 import { SUBJECTS_DATA } from '../../data/subjects';

@@ -190,10 +190,12 @@ export const SourcesLibrary: React.FC = () => {
             key={src.id}
             className="glass-card"
             style={{
-              padding: '24px',
+              padding: 'clamp(14px, 3.5vw, 22px)',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              width: '100%',
+              boxSizing: 'border-box'
             }}
           >
             <div>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppUser, AcademicGroup, AuditLogEntry, UserRole } from '../types/edki';
 import { MOCK_USERS, MOCK_ACADEMIC_GROUPS } from '../data/mockUsers';
+import { api } from '../services/api';
 
 interface AuthContextType {
   currentUser: AppUser | null;
@@ -18,7 +19,7 @@ interface AuthContextType {
   canManageStudents: boolean; // Teacher & Admin
 
   // Auth actions
-  login: (username: string, password: string) => { success: boolean; message: string };
+  login: (username: string, password: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
 
   // User management
@@ -38,7 +39,7 @@ interface AuthContextType {
     email?: string;
     username: string;
     password: string;
-  }) => { success: boolean; message: string; user?: AppUser };
+  }) => Promise<{ success: boolean; message: string; user?: AppUser }>;
   bulkAddStudents: (groupName: string, namesList: string[]) => number;
   addTeacher: (data: { name: string; department: string; email: string; username: string; password: string }) => AppUser;
   updateUserStatus: (userId: string, isActive: boolean) => void;
@@ -153,6 +154,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(academicGroups)); }, [academicGroups]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(auditLogs)); }, [auditLogs]);
 
+  // Synchronize users and academic groups with PostgreSQL backend when available
+  useEffect(() => {
+    let isMounted = true;
+    api.fetchUsers().then(remoteUsers => {
+      if (isMounted && remoteUsers && Array.isArray(remoteUsers) && remoteUsers.length > 0) {
+        setAllUsers(prev => {
+          const remoteMap = new Map(remoteUsers.map(u => [u.id, u]));
+          const merged = [...remoteUsers];
+          prev.forEach(u => {
+            if (!remoteMap.has(u.id)) {
+              merged.push(u);
+            }
+          });
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(merged));
+          return merged;
+        });
+      }
+    });
+
+    api.fetchGroups().then(remoteGroups => {
+      if (isMounted && remoteGroups && Array.isArray(remoteGroups) && remoteGroups.length > 0) {
+        setAcademicGroups(remoteGroups);
+        localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(remoteGroups));
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const currentUser = currentUserId ? (allUsers.find(u => u.id === currentUserId) || null) : null;
   const isLoggedIn = currentUser !== null;
 
@@ -171,8 +203,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // ── Authentication ───────────────────────────────────────────────────────────
-  const login = (username: string, password: string): { success: boolean; message: string } => {
-    const trimmed = username.trim().toLowerCase();
+  const login = async (username: string, password: string): Promise<{ success: boolean; message: string }> => {
+    const cleanUsername = username.trim();
+    const trimmed = cleanUsername.toLowerCase();
+
+    // 1. First, attempt backend API login against PostgreSQL
+    try {
+      const serverRes = await api.login(cleanUsername, password);
+      if (serverRes.success && serverRes.user) {
+        const serverUser = serverRes.user;
+        setCurrentUserId(serverUser.id);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, serverUser.id);
+
+        setAllUsers(prev => {
+          const exists = prev.some(u => u.id === serverUser.id);
+          const updated = exists ? prev.map(u => u.id === serverUser.id ? serverUser : u) : [serverUser, ...prev];
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
+          return updated;
+        });
+
+        const logEntry: AuditLogEntry = {
+          id: 'log-' + Date.now(),
+          timestamp: new Date().toISOString(),
+          userId: serverUser.id,
+          userName: serverUser.name,
+          userRole: serverUser.role,
+          action: 'Вхід до системи (PostgreSQL)',
+          details: `Успішна авторизація через сервер: ${serverUser.username} (${serverUser.role})`
+        };
+        setAuditLogs(prev => [logEntry, ...prev.slice(0, 199)]);
+        api.logAudit({
+          timestamp: logEntry.timestamp,
+          userId: serverUser.id,
+          userName: serverUser.name,
+          userRole: serverUser.role,
+          action: logEntry.action,
+          details: logEntry.details
+        });
+
+        return { success: true, message: `Ласкаво просимо, ${serverUser.firstName}!` };
+      } else if (!serverRes.isOffline && serverRes.message) {
+        // Explicit rejection from PostgreSQL (e.g. wrong password or account deactivated)
+        return { success: false, message: serverRes.message };
+      }
+    } catch {
+      // Offline fallback
+    }
+
+    // 2. Seamless offline fallback: localStorage / mock users
     let user = allUsers.find(
       u => u.username.toLowerCase() === trimmed && u.password === password
     );
@@ -187,7 +265,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user = parsed.find((u: AppUser) => u.username.toLowerCase() === trimmed && u.password === password);
           }
         }
-      } catch (e) {}
+      } catch {}
     }
 
     if (!user) {
@@ -200,15 +278,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUserId(user.id);
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, user.id);
 
-    // Log the event after state update (currentUser will be null here, so we directly log)
+    // Log the event
     setAuditLogs(prev => [{
       id: 'log-' + Date.now(),
       timestamp: new Date().toISOString(),
       userId: user.id,
       userName: user.name,
       userRole: user.role,
-      action: 'Вхід до системи',
-      details: `Успішна авторизація: ${user.username} (${user.role})`
+      action: 'Вхід до системи (Офлайн)',
+      details: `Успішна автономна авторизація: ${user.username} (${user.role})`
     }, ...prev.slice(0, 199)]);
 
     return { success: true, message: `Ласкаво просимо, ${user.firstName}!` };
@@ -231,59 +309,97 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // ── User management ──────────────────────────────────────────────────────────
-  const registerStudent = (data: {
+  const registerStudent = async (data: {
     firstName: string;
     lastName: string;
     groupName: string;
     email?: string;
     username: string;
     password: string;
-  }): { success: boolean; message: string; user?: AppUser } => {
+  }): Promise<{ success: boolean; message: string; user?: AppUser }> => {
     const cleanUsername = data.username.trim();
-    if (allUsers.some(u => u.username.toLowerCase() === cleanUsername.toLowerCase())) {
-      return { success: false, message: `Логін "${cleanUsername}" уже зайнятий. Будь ласка, оберіть інший.` };
-    }
-    const cleanEmail = data.email?.trim();
-    if (cleanEmail && allUsers.some(u => u.email && u.email.toLowerCase() === cleanEmail.toLowerCase())) {
-      return { success: false, message: `Користувач із поштою "${cleanEmail}" вже зареєстрований.` };
+    const cleanEmail = data.email?.trim() || `${cleanUsername}@stud.edu.ua`;
+    const fullName = `${data.lastName.trim()} ${data.firstName.trim()}`;
+
+    // 1. Try to register on PostgreSQL backend
+    let savedUser: AppUser | undefined;
+    try {
+      const serverRes = await api.registerUser({
+        name: fullName,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        role: 'student',
+        groupName: data.groupName,
+        email: cleanEmail,
+        username: cleanUsername,
+        password: data.password
+      });
+
+      if (serverRes.success && serverRes.user) {
+        savedUser = serverRes.user;
+      } else if (!serverRes.isOffline && serverRes.message) {
+        // Explicit rejection from PostgreSQL (e.g. login already taken on server)
+        return { success: false, message: serverRes.message };
+      }
+    } catch {
+      // Offline fallback
     }
 
-    const newStudent: AppUser = {
-      id: 'stud-' + Date.now(),
-      name: `${data.lastName.trim()} ${data.firstName.trim()}`,
-      firstName: data.firstName.trim(),
-      lastName: data.lastName.trim(),
-      role: 'student',
-      groupName: data.groupName,
-      email: cleanEmail || `${cleanUsername}@stud.edu.ua`,
-      username: cleanUsername,
-      password: data.password,
-      isActive: true,
-      createdAt: new Date().toISOString()
-    };
+    // 2. Offline fallback if server unavailable
+    if (!savedUser) {
+      if (allUsers.some(u => u.username.toLowerCase() === cleanUsername.toLowerCase())) {
+        return { success: false, message: `Логін "${cleanUsername}" уже зайнятий. Будь ласка, оберіть інший.` };
+      }
+      if (cleanEmail && allUsers.some(u => u.email && u.email.toLowerCase() === cleanEmail.toLowerCase())) {
+        return { success: false, message: `Користувач із поштою "${cleanEmail}" вже зареєстрований.` };
+      }
+
+      savedUser = {
+        id: 'stud-' + Date.now(),
+        name: fullName,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        role: 'student',
+        groupName: data.groupName,
+        email: cleanEmail,
+        username: cleanUsername,
+        password: data.password,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+    }
 
     // Update state and immediately persist users
     setAllUsers(prev => {
-      const updated = [...prev, newStudent];
+      const updated = [...prev.filter(u => u.id !== savedUser!.id), savedUser!];
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
       return updated;
     });
 
     // Directly set user session so the user is instantly logged in
-    setCurrentUserId(newStudent.id);
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newStudent.id);
+    setCurrentUserId(savedUser.id);
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, savedUser.id);
 
-    setAuditLogs(prev => [{
+    const logEntry: AuditLogEntry = {
       id: 'log-' + Date.now(),
       timestamp: new Date().toISOString(),
-      userId: newStudent.id,
-      userName: newStudent.name,
+      userId: savedUser.id,
+      userName: savedUser.name,
       userRole: 'student',
       action: 'Реєстрація студента',
-      details: `Успішна самостійна реєстрація: ${newStudent.username} (група ${newStudent.groupName})`
-    }, ...prev.slice(0, 199)]);
+      details: `Успішна реєстрація: ${savedUser.username} (група ${savedUser.groupName})`
+    };
+    setAuditLogs(prev => [logEntry, ...prev.slice(0, 199)]);
+    api.logAudit({
+      timestamp: logEntry.timestamp,
+      userId: savedUser.id,
+      userName: savedUser.name,
+      userRole: 'student',
+      action: logEntry.action,
+      details: logEntry.details
+    });
 
-    return { success: true, message: `Ласкаво просимо, ${newStudent.firstName}!`, user: newStudent };
+    return { success: true, message: `Ласкаво просимо, ${savedUser.firstName}!`, user: savedUser };
   };
 
   const addStudent = (data: {
@@ -380,6 +496,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isActive ? 'Активовано доступ' : 'Деактивовано доступ',
       `Користувач: ${user?.name || userId}`
     );
+    api.updateUserStatus(userId, isActive);
     // If the deactivated user is currently logged in, force logout
     if (!isActive && userId === currentUserId) {
       setCurrentUserId(null);
@@ -390,12 +507,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, password: newPassword } : u));
     const user = allUsers.find(u => u.id === userId);
     addAuditLog('Скинуто пароль', `Пароль змінено для: ${user?.name || userId}`);
+    api.resetPassword(userId, newPassword);
   };
 
   const deleteUser = (userId: string) => {
     const user = allUsers.find(u => u.id === userId);
     setAllUsers(prev => prev.filter(u => u.id !== userId));
     addAuditLog('Видалено користувача', `${user?.name || userId} (${user?.role})`);
+    api.deleteUser(userId);
     if (userId === currentUserId) setCurrentUserId(null);
   };
 
