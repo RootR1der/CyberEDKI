@@ -67,7 +67,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
     return true;
   });
 
-  const handleCreateStudent = (e: React.FormEvent) => {
+  const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFirstName.trim() || !newLastName.trim() || !newUsername.trim() || !newPassword.trim()) {
       alert('Заповніть всі поля');
@@ -77,7 +77,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
       alert(`Логін "${newUsername}" вже зайнятий`);
       return;
     }
-    const student = addStudent({
+    const student = await addStudent({
       firstName: newFirstName.trim(),
       lastName: newLastName.trim(),
       groupName: newGroupName,

@@ -63,7 +63,7 @@ interface EdkiContextType {
 }
 
 const STORAGE_KEYS = {
-  QUESTIONS: 'cyberedki_questions_v3',
+  QUESTIONS: 'cyberedki_questions_v4',
   ATTEMPTS: 'cyberedki_attempts_v2',
   MISTAKES: 'cyberedki_mistakes_v2',
   BOOKMARKS: 'cyberedki_bookmarks_v2',
@@ -149,13 +149,12 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return {};
   });
 
-  // User-scoped mistakes: ONLY mistakes made by the current logged-in user!
+  // User-scoped mistakes: mistakes made by the current logged-in user (with fallback for legacy/guest items)
   const mistakes = useMemo<Record<string, UserMistake>>(() => {
-    const currentUid = currentUser?.id;
-    if (!currentUid) return {};
+    const currentUid = currentUser?.id || 'guest';
     const result: Record<string, UserMistake> = {};
     Object.values(allMistakes).forEach(m => {
-      if (m.userId === currentUid) {
+      if (m.userId === currentUid || (!m.userId && (currentUid === 'user-student-1' || currentUid === 'guest'))) {
         result[m.questionId] = m;
       }
     });
@@ -305,14 +304,40 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
       completedAt: attemptData.completedAt || new Date().toISOString()
     };
 
-    // Learning / topic / blitz already record live on each click.
-    // Unanswered items must not enter the mistakes bank.
-    if (newAttempt.mode === 'simulation') {
+    // Update mistakes atomically across all test modes.
+    // Every question where !ans.isCorrect (including unanswered questions at exam finish)
+    // is recorded as a mistake for the student.
+    const currentUid = currentUser?.id || 'guest';
+    const now = new Date().toISOString();
+
+    setAllMistakes(prev => {
+      const updated = { ...prev };
       newAttempt.answers.forEach(ans => {
-        if (ans.selectedOption == null) return;
-        recordQuestionResult(ans.questionId, ans.isCorrect);
+        const storageKey = `${currentUid}_${ans.questionId}`;
+        const current = updated[storageKey];
+        if (!ans.isCorrect) {
+          updated[storageKey] = {
+            questionId: ans.questionId,
+            userId: currentUid,
+            firstFailedAt: current ? current.firstFailedAt : now,
+            lastFailedAt: now,
+            failCount: (current?.failCount || 0) + 1,
+            consecutiveCorrect: 0,
+            isMastered: false
+          };
+        } else {
+          if (current && !current.isMastered) {
+            const nextConsecutive = current.consecutiveCorrect + 1;
+            updated[storageKey] = {
+              ...current,
+              consecutiveCorrect: nextConsecutive,
+              isMastered: nextConsecutive >= 2
+            };
+          }
+        }
       });
-    }
+      return updated;
+    });
 
     setAttempts(prev => [newAttempt, ...prev]);
     // Asynchronously persist to PostgreSQL backend
