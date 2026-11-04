@@ -75,7 +75,7 @@ export const AdminPanel: React.FC = () => {
     (t.email || '').toLowerCase().includes(searchTeacher.toLowerCase())
   );
 
-  const handleAddTeacher = (e: React.FormEvent) => {
+  const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teacherName.trim() || !teacherEmail.trim() || !teacherUsername.trim() || !teacherPassword.trim()) {
       alert('Заповніть всі поля: ПІБ, Email, Логін та Пароль');
@@ -86,7 +86,7 @@ export const AdminPanel: React.FC = () => {
       alert(`Логін "${teacherUsername}" вже існує в системі. Оберіть інший.`);
       return;
     }
-    addTeacher({
+    const created = await addTeacher({
       name: teacherName.trim(),
       department,
       email: teacherEmail.trim(),
@@ -97,7 +97,7 @@ export const AdminPanel: React.FC = () => {
     setTeacherEmail('');
     setTeacherUsername('');
     setTeacherPassword('');
-    alert(`Викладача "${teacherName}" додано! Логін: ${teacherUsername}`);
+    alert(`Викладача "${created.name}" додано! Логін: ${created.username}`);
   };
 
   const handleAddGroup = (e: React.FormEvent) => {
@@ -994,7 +994,16 @@ export const AdminPanel: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button
                   className="btn btn-secondary"
-                  onClick={exportBackupJson}
+                  onClick={() => {
+                    const jsonStr = exportBackupJson();
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `cyberedki_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
                   style={{ justifyContent: 'flex-start', gap: '10px' }}
                 >
                   <Download size={16} />
@@ -1006,9 +1015,9 @@ export const AdminPanel: React.FC = () => {
                 <button
                   className="btn btn-secondary"
                   onClick={() => {
-                    if (!confirm('Скинути прогрес усіх тестувань? Питання залишаться.')) return;
-                    resetAllProgress();
-                    alert('Прогрес скинуто.');
+                    if (resetAllProgress('all')) {
+                      alert('Прогрес скинуто.');
+                    }
                   }}
                   style={{ justifyContent: 'flex-start', gap: '10px', borderColor: 'rgba(244,63,94,0.3)' }}
                 >

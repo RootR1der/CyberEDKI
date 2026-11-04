@@ -12,12 +12,12 @@ import {
   Trash2
 } from 'lucide-react';
 import { useEdki } from '../../context/EdkiContext';
-import { SUBJECTS_DATA } from '../../data/subjects';
 import { Question, OptionKey, Difficulty, QuestionType } from '../../types/edki';
 
 export const AdminManager: React.FC = () => {
   const {
     questions,
+    subjects,
     createQuestion,
     deleteQuestion,
     exportBackupJson,
@@ -51,11 +51,11 @@ export const AdminManager: React.FC = () => {
   const [sourceUrl, setSourceUrl] = useState('');
   const [jsonText, setJsonText] = useState('');
 
-  const selectedSubject = SUBJECTS_DATA.find(s => s.id === subjectId) || SUBJECTS_DATA[0];
+  const selectedSubject = subjects.find(s => s.id === subjectId) || subjects[0];
 
   const handleSubjectChange = (newSubId: number) => {
     setSubjectId(newSubId);
-    const sub = SUBJECTS_DATA.find(s => s.id === newSubId);
+    const sub = subjects.find(s => s.id === newSubId);
     if (sub && sub.topics.length > 0) {
       setTopicId(sub.topics[0].id);
       setSubtopic(sub.topics[0].subtopics[0] || '');
@@ -201,7 +201,7 @@ export const AdminManager: React.FC = () => {
                   outline: 'none'
                 }}
               >
-                {SUBJECTS_DATA.map(s => (
+                {subjects.map(s => (
                   <option key={s.id} value={s.id}>{s.id}. {s.name}</option>
                 ))}
               </select>
@@ -340,7 +340,7 @@ export const AdminManager: React.FC = () => {
               { id: 'C' as OptionKey, val: optC, setVal: setOptC, exp: expC, setExp: setExpC },
               { id: 'D' as OptionKey, val: optD, setVal: setOptD, exp: expD, setExp: setExpD }
             ].map(item => (
-              <div 
+              <div
                 key={item.id}
                 style={{
                   background: 'rgba(255, 255, 255, 0.02)',
@@ -506,7 +506,7 @@ export const AdminManager: React.FC = () => {
               <span>Завантажити повну резервну копію (JSON)</span>
             </button>
 
-            <button className="btn btn-danger" onClick={resetAllProgress}>
+            <button className="btn btn-danger" onClick={() => resetAllProgress()}>
               <RotateCcw size={18} />
               <span>Скинути статистику та банк помилок</span>
             </button>
@@ -569,10 +569,10 @@ export const AdminManager: React.FC = () => {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {questions.map((q, idx) => {
-              const sub = SUBJECTS_DATA.find(s => s.id === q.subjectId);
+              const sub = subjects.find(s => s.id === q.subjectId);
 
               return (
-                <div 
+                <div
                   key={q.id}
                   style={{
                     padding: '14px 18px',

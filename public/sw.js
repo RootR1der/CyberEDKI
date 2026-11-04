@@ -1,5 +1,5 @@
-const CACHE_NAME = 'cyberedki-shell-v1';
-const DATA_CACHE_NAME = 'cyberedki-data-v1';
+const CACHE_NAME = 'cyberedki-shell-v2';
+const DATA_CACHE_NAME = 'cyberedki-data-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -43,6 +43,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(request.url);
+
+  // Never cache auth endpoints (they include user records and credentials)
+  if (url.pathname.startsWith('/api/auth')) {
+    return;
+  }
 
   // Strategy 1: Question and Catalog APIs — Network-First with Cache Fallback
   if (url.pathname.startsWith('/api/')) {
@@ -101,4 +106,3 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
-

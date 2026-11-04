@@ -31,7 +31,7 @@ interface AuthContextType {
     email?: string;
     username: string;
     password: string;
-  }) => AppUser;
+  }) => Promise<AppUser>;
   registerStudent: (data: {
     firstName: string;
     lastName: string;
@@ -40,8 +40,8 @@ interface AuthContextType {
     username: string;
     password: string;
   }) => Promise<{ success: boolean; message: string; user?: AppUser }>;
-  bulkAddStudents: (groupName: string, namesList: string[]) => number;
-  addTeacher: (data: { name: string; department: string; email: string; username: string; password: string }) => AppUser;
+  bulkAddStudents: (groupName: string, namesList: string[]) => Promise<number>;
+  addTeacher: (data: { name: string; department: string; email: string; username: string; password: string }) => Promise<AppUser>;
   updateUserStatus: (userId: string, isActive: boolean) => void;
   resetUserPassword: (userId: string, newPassword: string) => void;
   deleteUser: (userId: string) => void;
@@ -79,21 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure credentials for Admin, Teacher, and Student match requirements
-          return parsed.map((u: AppUser) => {
-            if (u.role === 'admin' || u.username.toLowerCase() === 'admin' || u.username.toLowerCase() === 'adm1n') {
-              return { ...u, username: 'AdM1n', password: 'te6tadm1N' };
-            }
-            if (u.id === 'user-teacher-1' || u.username.toLowerCase() === 'v.petrenko' || u.username.toLowerCase() === 'teacher') {
-              return { ...u, username: 'Teacher', password: 'te6tTeac4' };
-            }
-            if (u.id === 'user-student-1' || u.username.toLowerCase() === 'o.kovalenko' || u.username.toLowerCase() === 'student') {
-              return { ...u, username: 'Student', password: 'Stu2eNt' };
-            }
-            return u;
-          });
+          return parsed;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return MOCK_USERS;
   });
@@ -116,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             inviteEnabled: g.inviteEnabled ?? true
           }));
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return MOCK_ACADEMIC_GROUPS;
   });
@@ -127,7 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) {}
+      } catch (e) { }
     }
     return [
       {
@@ -154,8 +142,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(academicGroups)); }, [academicGroups]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(auditLogs)); }, [auditLogs]);
 
-  // Synchronize users and academic groups with PostgreSQL backend when available
+  // Academic groups are needed on the login/register screen
   useEffect(() => {
+    let isMounted = true;
+    api.fetchGroups().then(remoteGroups => {
+      if (isMounted && remoteGroups && Array.isArray(remoteGroups) && remoteGroups.length > 0) {
+        setAcademicGroups(remoteGroups);
+        localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(remoteGroups));
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const currentUser = currentUserId ? (allUsers.find(u => u.id === currentUserId) || null) : null;
+  const isLoggedIn = currentUser !== null;
+
+  // Do not download the full user list (with passwords) into every student browser
+  useEffect(() => {
+    if (currentUser?.role !== 'teacher' && currentUser?.role !== 'admin') return;
     let isMounted = true;
     api.fetchUsers().then(remoteUsers => {
       if (isMounted && remoteUsers && Array.isArray(remoteUsers) && remoteUsers.length > 0) {
@@ -172,21 +178,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     });
-
-    api.fetchGroups().then(remoteGroups => {
-      if (isMounted && remoteGroups && Array.isArray(remoteGroups) && remoteGroups.length > 0) {
-        setAcademicGroups(remoteGroups);
-        localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(remoteGroups));
-      }
-    });
-
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  const currentUser = currentUserId ? (allUsers.find(u => u.id === currentUserId) || null) : null;
-  const isLoggedIn = currentUser !== null;
+  }, [currentUser?.role]);
 
   // ── Audit log helper (uses currentUser if available) ────────────────────────
   const addAuditLog = (action: string, details: string) => {
@@ -265,7 +260,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user = parsed.find((u: AppUser) => u.username.toLowerCase() === trimmed && u.password === password);
           }
         }
-      } catch {}
+      } catch { }
     }
 
     if (!user) {
@@ -402,15 +397,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: `Ласкаво просимо, ${savedUser.firstName}!`, user: savedUser };
   };
 
-  const addStudent = (data: {
+  const addStudent = async (data: {
     firstName: string;
     lastName: string;
     groupName: string;
     email?: string;
     username: string;
     password: string;
-  }): AppUser => {
-    const newStudent: AppUser = {
+  }): Promise<AppUser> => {
+    const localStudent: AppUser = {
       id: 'stud-' + Date.now(),
       name: `${data.lastName} ${data.firstName}`,
       firstName: data.firstName,
@@ -424,53 +419,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
 
+    let saved = localStudent;
+    try {
+      const serverRes = await api.registerUser({
+        name: localStudent.name,
+        firstName: localStudent.firstName,
+        lastName: localStudent.lastName,
+        role: 'student',
+        groupName: localStudent.groupName,
+        email: localStudent.email,
+        username: localStudent.username,
+        password: localStudent.password
+      });
+      if (serverRes.success && serverRes.user) {
+        saved = serverRes.user;
+      }
+    } catch {
+      // Offline fallback keeps the local student
+    }
+
     setAllUsers(prev => {
-      const updated = [...prev, newStudent];
+      const updated = [...prev.filter(u => u.id !== saved.id && u.username !== saved.username), saved];
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updated));
       return updated;
     });
-    addAuditLog('Додано нового студента', `${newStudent.name}, група ${newStudent.groupName}, логін: ${newStudent.username}`);
-    return newStudent;
+    addAuditLog('Додано нового студента', `${saved.name}, група ${saved.groupName}, логін: ${saved.username}`);
+    return saved;
   };
 
-  const bulkAddStudents = (groupName: string, namesList: string[]): number => {
-    let count = 0;
-    const newStudents: AppUser[] = [];
+  const bulkAddStudents = async (groupName: string, namesList: string[]): Promise<number> => {
+    const created: AppUser[] = [];
 
-    namesList.forEach((fullName, idx) => {
+    for (const [idx, fullName] of namesList.entries()) {
       const trimmed = fullName.trim();
-      if (!trimmed) return;
+      if (!trimmed) continue;
       const parts = trimmed.split(' ');
       const lastName = parts[0] || 'Студент';
       const firstName = parts.slice(1).join(' ') || 'Ім\'я';
       const baseUsername = `${lastName.toLowerCase()}.${firstName[0]?.toLowerCase() || 'x'}${groupName.toLowerCase().replace('-', '')}`;
 
-      newStudents.push({
-        id: 'stud-' + (Date.now() + idx),
-        name: `${lastName} ${firstName}`,
+      const student = await addStudent({
         firstName,
         lastName,
-        role: 'student',
         groupName,
         email: `${baseUsername}@stud.edu.ua`,
-        username: baseUsername,
-        password: 'Student1234',
-        isActive: true,
-        createdAt: new Date().toISOString()
+        username: `${baseUsername}${idx > 0 ? idx : ''}`,
+        password: 'Student1234'
       });
-      count++;
-    });
-
-    if (newStudents.length > 0) {
-      setAllUsers(prev => [...prev, ...newStudents]);
-      addAuditLog('Груповий імпорт студентів', `Додано ${newStudents.length} студентів до групи ${groupName}. Пароль за замовчуванням: Student1234`);
+      created.push(student);
     }
-    return count;
+
+    if (created.length > 0) {
+      addAuditLog('Груповий імпорт студентів', `Додано ${created.length} студентів до групи ${groupName}. Пароль за замовчуванням: Student1234`);
+    }
+    return created.length;
   };
 
-  const addTeacher = (data: { name: string; department: string; email: string; username: string; password: string }): AppUser => {
+  const addTeacher = async (data: { name: string; department: string; email: string; username: string; password: string }): Promise<AppUser> => {
     const parts = data.name.split(' ');
-    const newTeacher: AppUser = {
+    const localTeacher: AppUser = {
       id: 'teach-' + Date.now(),
       name: data.name,
       firstName: parts[1] || data.name,
@@ -484,9 +491,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString()
     };
 
-    setAllUsers(prev => [...prev, newTeacher]);
-    addAuditLog('Призначено викладача', `${newTeacher.name}, ${newTeacher.department}, логін: ${newTeacher.username}`);
-    return newTeacher;
+    let saved = localTeacher;
+    try {
+      const serverRes = await api.registerUser({
+        name: localTeacher.name,
+        firstName: localTeacher.firstName,
+        lastName: localTeacher.lastName,
+        role: 'teacher',
+        email: localTeacher.email,
+        username: localTeacher.username,
+        password: localTeacher.password,
+        department: localTeacher.department
+      });
+      if (serverRes.success && serverRes.user) {
+        saved = serverRes.user;
+      }
+    } catch {
+      // Offline fallback
+    }
+
+    setAllUsers(prev => [...prev.filter(u => u.id !== saved.id && u.username !== saved.username), saved]);
+    addAuditLog('Призначено викладача', `${saved.name}, ${saved.department}, логін: ${saved.username}`);
+    return saved;
   };
 
   const updateUserStatus = (userId: string, isActive: boolean) => {
@@ -546,7 +572,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const clean = emailOrUsername.trim().toLowerCase();
     const user = allUsers.find(
       u => (u.email && u.email.trim().toLowerCase() === clean) ||
-           u.username.trim().toLowerCase() === clean
+        u.username.trim().toLowerCase() === clean
     );
     if (!user) {
       return { success: false, message: 'Користувача з такою електронною поштою або логіном не знайдено в системі.' };
@@ -566,7 +592,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const clean = emailOrUsername.trim().toLowerCase();
     const user = allUsers.find(
       u => (u.email && u.email.trim().toLowerCase() === clean) ||
-           u.username.trim().toLowerCase() === clean
+        u.username.trim().toLowerCase() === clean
     );
     if (!user) {
       return { success: false, message: 'Користувача не знайдено.' };
@@ -575,6 +601,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Пароль має містити щонайменше 6 символів.' };
     }
     setAllUsers(prev => prev.map(u => u.id === user.id ? { ...u, password: newPassword } : u));
+    api.resetPassword(user.id, newPassword);
     addAuditLog('Відновлення пароля через email', `Успішно змінено пароль для ${user.name} (${user.email || user.username})`);
     return { success: true, message: 'Пароль успішно змінено! Тепер ви можете увійти.' };
   };
