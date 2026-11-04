@@ -9,7 +9,6 @@ import {
   Award
 } from 'lucide-react';
 import { useEdki } from '../../context/EdkiContext';
-import { SUBJECTS_DATA } from '../../data/subjects';
 import { Question, Difficulty, TestMode } from '../../types/edki';
 
 interface TrainingSetupProps {
@@ -18,7 +17,7 @@ interface TrainingSetupProps {
 }
 
 export const TrainingSetup: React.FC<TrainingSetupProps> = ({ onStartQuiz, preselectedSubjectId }) => {
-  const { questions } = useEdki();
+  const { questions, subjects } = useEdki();
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | 'all'>(preselectedSubjectId || 'all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | 'all'>('all');
@@ -43,7 +42,7 @@ export const TrainingSetup: React.FC<TrainingSetupProps> = ({ onStartQuiz, prese
 
     let modeTitle = 'Навчальне тренування';
     if (selectedSubjectId !== 'all') {
-      const sub = SUBJECTS_DATA.find(s => s.id === selectedSubjectId);
+      const sub = subjects.find(s => s.id === selectedSubjectId);
       modeTitle = `Тематичний тест: ${sub?.name}`;
     } else if (trainingMode === 'blitz') {
       modeTitle = 'Швидкий бліц-тест';
@@ -146,7 +145,7 @@ export const TrainingSetup: React.FC<TrainingSetupProps> = ({ onStartQuiz, prese
             }}
           >
             <option value="all">Усі 20 предметних областей (Комплексне тренування)</option>
-            {SUBJECTS_DATA.map(s => (
+            {subjects.map(s => (
               <option key={s.id} value={s.id}>
                 {s.id}. {s.name}
               </option>

@@ -2201,7 +2201,7 @@ export const SubjectCatalog: React.FC<SubjectCatalogProps> = ({ onStartSubjectDr
                 <span>Імпортувати запитання у базу</span>
               </button>
 
-              <button className="btn btn-secondary" onClick={resetAllProgress} style={{ padding: '10px 18px', gap: '8px', justifyContent: 'center', color: 'var(--accent-amber)', marginTop: '8px' }}>
+              <button className="btn btn-secondary" onClick={() => resetAllProgress()} style={{ padding: '10px 18px', gap: '8px', justifyContent: 'center', color: 'var(--accent-amber)', marginTop: '8px' }}>
                 <RotateCcw size={16} />
                 <span>Скинути прогрес та спроби тестувань</span>
               </button>

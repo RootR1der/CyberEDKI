@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { Question, OptionKey, TestMode, TestAttempt, QuestionAnswerRecord, ProctoringViolation } from '../../types/edki';
 import { useEdki } from '../../context/EdkiContext';
-import { SUBJECTS_DATA } from '../../data/subjects';
 
 interface QuizEngineProps {
   questions: Question[];
@@ -42,7 +41,8 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
     saveTestAttempt,
     recordQuestionResult,
     toggleBookmark,
-    isBookmarked
+    isBookmarked,
+    subjects
   } = useEdki();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -83,7 +83,9 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
 
   const currentQ = shuffledQuestions[currentIndex];
   const isSimulation = mode === 'simulation';
-  const timerRef = useRef<any>(null);
+  const hasTimer = timeLimitSeconds > 0;
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finishingRef = useRef(false);
   const selectedAnswersRef = useRef(selectedAnswers);
   const flaggedQuestionsRef = useRef(flaggedQuestions);
   const timeRemainingRef = useRef(timeRemaining);
@@ -96,13 +98,13 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
   const finishExamRef = useRef<() => void>(() => {});
   const disqualifyRef = useRef<(reason: string, violation: ProctoringViolation) => void>(() => {});
 
-  // Countdown timer for simulation
+  // Countdown timer for timed quizzes (simulation, blitz, cluster, topic)
   useEffect(() => {
-    if (isSimulation && !isCompleted) {
+    if (hasTimer && !isCompleted) {
       timerRef.current = setInterval(() => {
         setTimeRemaining(prev => {
           if (prev <= 1) {
-            clearInterval(timerRef.current);
+            if (timerRef.current) clearInterval(timerRef.current);
             finishExamRef.current();
             return 0;
           }
@@ -113,14 +115,15 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isSimulation, isCompleted]);
+  }, [hasTimer, isCompleted]);
 
   // ------------------- Proctoring: Instant Disqualification -------------------
   // Any violation immediately terminates the simulation test
 
   const disqualifyTestImmediate = (reason: string, violation: ProctoringViolation) => {
-    if (disqualifiedRef.current) return; // prevent double-fire
+    if (disqualifiedRef.current || finishingRef.current) return; // prevent double-fire
     disqualifiedRef.current = true;
+    finishingRef.current = true;
 
     if (timerRef.current) clearInterval(timerRef.current);
 
@@ -186,36 +189,28 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
 
     const onBlur = () => {
       if (disqualifiedRef.current) return;
+      // Desktop blur fires on notifications, other windows and DevTools — do not disqualify.
+      if (!isTouchDevice) return;
 
-      if (isTouchDevice) {
-        blurStrikesRef.current += 1;
-        const currentStrikes = blurStrikesRef.current;
-        const v: ProctoringViolation = {
-          id: `${Date.now()}-blur`,
-          type: 'blur',
-          description: `Втрата фокуса вікна браузера на телефоні (попередження ${currentStrikes}/3)`,
-          timestamp: new Date().toISOString(),
-        };
-        proctoringViolationsRef.current.push(v);
-        setProctoringViolations([...proctoringViolationsRef.current]);
+      blurStrikesRef.current += 1;
+      const currentStrikes = blurStrikesRef.current;
+      const v: ProctoringViolation = {
+        id: `${Date.now()}-blur`,
+        type: 'blur',
+        description: `Втрата фокуса вікна браузера на телефоні (попередження ${currentStrikes}/3)`,
+        timestamp: new Date().toISOString(),
+      };
+      proctoringViolationsRef.current.push(v);
+      setProctoringViolations([...proctoringViolationsRef.current]);
 
-        if (currentStrikes >= 3) {
-          disqualifyRef.current('Вичерпано 3 попередження про втрату фокусу вікна на мобільному пристрої', v);
-        } else {
-          setMobileWarning({
-            show: true,
-            strikes: currentStrikes,
-            maxStrikes: 3
-          });
-        }
+      if (currentStrikes >= 3) {
+        disqualifyRef.current('Вичерпано 3 попередження про втрату фокусу вікна на мобільному пристрої', v);
       } else {
-        const v: ProctoringViolation = {
-          id: `${Date.now()}-blur`,
-          type: 'blur',
-          description: 'Втрата фокуса вікна браузера',
-          timestamp: new Date().toISOString(),
-        };
-        disqualifyRef.current(v.description, v);
+        setMobileWarning({
+          show: true,
+          strikes: currentStrikes,
+          maxStrikes: 3
+        });
       }
     };
 
@@ -232,13 +227,14 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
       }
     };
 
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const onResize = () => {
       if (disqualifiedRef.current) return;
-
-      // On touch devices, virtual keyboard and dynamic address bar change window height.
-      // We ignore height changes on touch devices, and only verify width against split screen.
-      if (isTouchDevice) {
-        const widthThreshold = 0.7;
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        // Only treat a clearly split viewport as a violation; ignore height-only
+        // changes (virtual keyboard, browser chrome, slightly resized window).
+        const widthThreshold = 0.5;
         if (window.innerWidth < screen.availWidth * widthThreshold) {
           const v: ProctoringViolation = {
             id: `${Date.now()}-split_screen`,
@@ -248,22 +244,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
           };
           disqualifyRef.current(v.description, v);
         }
-        return;
-      }
-
-      const threshold = 0.8;
-      if (
-        window.innerWidth < screen.availWidth * threshold ||
-        window.innerHeight < screen.availHeight * threshold
-      ) {
-        const v: ProctoringViolation = {
-          id: `${Date.now()}-split_screen`,
-          type: 'split_screen',
-          description: 'Виявлено розділення екрану або зменшення робочої області',
-          timestamp: new Date().toISOString(),
-        };
-        disqualifyRef.current(v.description, v);
-      }
+      }, 400);
     };
 
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -280,6 +261,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
         document.removeEventListener('fullscreenchange', onFullscreenChange);
       }
       window.removeEventListener('resize', onResize);
+      if (resizeTimer) clearTimeout(resizeTimer);
     };
   }, [isSimulation, isCompleted]);
 
@@ -326,6 +308,8 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
   };
 
   const finishExam = () => {
+    if (finishingRef.current || isCompleted) return;
+    finishingRef.current = true;
     if (timerRef.current) clearInterval(timerRef.current);
 
     const answerRecords: QuestionAnswerRecord[] = shuffledQuestions.map(q => {
@@ -529,7 +513,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
             {filteredReviewQuestions.map((q, idx) => {
               const record = completedAttempt.answers.find(a => a.questionId === q.id);
               const isCorrect = record?.isCorrect;
-              const sub = SUBJECTS_DATA.find(s => s.id === q.subjectId);
+              const sub = subjects.find(s => s.id === q.subjectId);
 
               return (
                 <div 
@@ -670,7 +654,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                       {(['A', 'B', 'C', 'D'] as OptionKey[]).map(key => (
                         <div key={key} style={{ fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.5 }}>
                           <strong style={{ color: key === q.correctAnswer ? 'var(--accent-emerald)' : '#94a3b8' }}>{key}: </strong>
-                          {q.optionExplanations[key]}
+                          {q.optionExplanations?.[key]}
                         </div>
                       ))}
                     </div>
@@ -690,9 +674,9 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                     }}>
                       <BookOpen size={14} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
                       <span style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        Джерело: <strong style={{ color: '#ffffff' }}>{q.source.title}</strong> ({q.source.articleOrSection})
+                        Джерело: <strong style={{ color: '#ffffff' }}>{q.source?.title}</strong> {q.source?.articleOrSection ? `(${q.source.articleOrSection})` : ''}
                       </span>
-                      {q.source.url && (
+                      {q.source?.url && (
                         <a 
                           href={q.source.url} 
                           target="_blank" 
@@ -730,7 +714,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
 
   const isSelected = selectedAnswers[currentQ.id];
   const isCurrentFlagged = flaggedQuestions[currentQ.id];
-  const sub = SUBJECTS_DATA.find(s => s.id === currentQ.subjectId);
+  const sub = subjects.find(s => s.id === currentQ.subjectId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '960px', width: '100%', minWidth: 0, margin: '0 auto', boxSizing: 'border-box' }}>
@@ -764,7 +748,7 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
             <span>Вийти</span>
           </button>
 
-          {isSimulation && (
+          {hasTimer && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1268,8 +1252,8 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                   flexWrap: 'wrap'
                 }}>
                   <BookOpen size={14} color="var(--accent-cyan)" />
-                  <span>Офіційне нормативне джерело: <strong style={{ color: '#ffffff' }}>{currentQ.source.title}</strong> {currentQ.source.articleOrSection ? `(${currentQ.source.articleOrSection})` : ''}</span>
-                  {currentQ.source.url && (
+                  <span>Офіційне нормативне джерело: <strong style={{ color: '#ffffff' }}>{currentQ.source?.title}</strong> {currentQ.source?.articleOrSection ? `(${currentQ.source.articleOrSection})` : ''}</span>
+                  {currentQ.source?.url && (
                     <a
                       href={currentQ.source.url}
                       target="_blank"
@@ -1624,8 +1608,8 @@ export const QuizEngine: React.FC<QuizEngineProps> = ({
                 flexWrap: 'wrap'
               }}>
                 <BookOpen size={15} color="var(--accent-cyan)" />
-                <span>Нормативне джерело: <strong style={{ color: '#ffffff' }}>{currentQ.source.title}</strong> {currentQ.source.articleOrSection ? `(${currentQ.source.articleOrSection})` : ''}</span>
-                {currentQ.source.url && (
+                <span>Нормативне джерело: <strong style={{ color: '#ffffff' }}>{currentQ.source?.title}</strong> {currentQ.source?.articleOrSection ? `(${currentQ.source.articleOrSection})` : ''}</span>
+                {currentQ.source?.url && (
                   <a
                     href={currentQ.source.url}
                     target="_blank"

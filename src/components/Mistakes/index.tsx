@@ -7,14 +7,13 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useEdki } from '../../context/EdkiContext';
-import { SUBJECTS_DATA } from '../../data/subjects';
 
 interface MistakesBankProps {
   onStartMistakesDrill: () => void;
 }
 
 export const MistakesBank: React.FC<MistakesBankProps> = ({ onStartMistakesDrill }) => {
-  const { mistakes, questions } = useEdki();
+  const { mistakes, questions, subjects } = useEdki();
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<number | 'all'>('all');
   const [activeTab, setActiveTab] = useState<'active' | 'mastered'>('active');
 
@@ -102,7 +101,7 @@ export const MistakesBank: React.FC<MistakesBankProps> = ({ onStartMistakesDrill
           }}
         >
           <option value="all">Всі предмети</option>
-          {SUBJECTS_DATA.map(s => (
+          {subjects.map(s => (
             <option key={s.id} value={s.id}>{s.id}. {s.name}</option>
           ))}
         </select>
@@ -125,7 +124,7 @@ export const MistakesBank: React.FC<MistakesBankProps> = ({ onStartMistakesDrill
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {filteredMistakes.map(({ mistake, question }) => {
             if (!question) return null;
-            const sub = SUBJECTS_DATA.find(s => s.id === question.subjectId);
+            const sub = subjects.find(s => s.id === question.subjectId);
 
             return (
               <div 

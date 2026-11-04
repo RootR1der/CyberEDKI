@@ -32,7 +32,7 @@ interface TeacherDashboardProps {
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTab }) => {
   const { allUsers, academicGroups, addStudent, bulkAddStudents, updateUserStatus, resetUserPassword, deleteUser, isTeacher, isAdmin, currentUser } = useAuth();
-  const { attempts, mistakes, questions } = useEdki();
+  const { attempts, allMistakes, questions } = useEdki();
 
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('all');
   const [studentSearch, setStudentSearch] = useState('');
@@ -67,7 +67,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
     return true;
   });
 
-  const handleCreateStudent = (e: React.FormEvent) => {
+  const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFirstName.trim() || !newLastName.trim() || !newUsername.trim() || !newPassword.trim()) {
       alert('Заповніть всі поля');
@@ -77,7 +77,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
       alert(`Логін "${newUsername}" вже зайнятий`);
       return;
     }
-    const student = addStudent({
+    const student = await addStudent({
       firstName: newFirstName.trim(),
       lastName: newLastName.trim(),
       groupName: newGroupName,
@@ -92,11 +92,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
     alert(`Студента додано! Логін: ${student.username}`);
   };
 
-  const handleBulkAdd = (e: React.FormEvent) => {
+  const handleBulkAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulkText.trim()) return;
     const names = bulkText.split('\n').map(n => n.trim()).filter(n => n.length > 0);
-    const count = bulkAddStudents(bulkGroup, names);
+    const count = await bulkAddStudents(bulkGroup, names);
     alert(`Успішно імпортовано ${count} студентів до групи ${bulkGroup}`);
     setBulkText('');
     setShowBulkAddModal(false);
@@ -112,7 +112,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
 
     const simulationAttempts = studentAttempts.filter(a => a.mode === 'simulation');
     const hasPassedSimulation = simulationAttempts.some(a => a.passed);
-    const studentMistakes = Object.values(mistakes).filter(m => m.userId === student.id && !m.isMastered).length;
+    const studentMistakes = Object.values(allMistakes).filter(m => m.userId === student.id && !m.isMastered).length;
 
     return {
       completedCount,

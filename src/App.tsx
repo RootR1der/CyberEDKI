@@ -13,12 +13,21 @@ import { TeacherDashboard } from './components/Teacher';
 import { ClustersView } from './components/Clusters';
 import { LoginPage } from './components/Login';
 import { Question, TestMode } from './types/edki';
-import { SUBJECTS_DATA } from './data/subjects';
 import { EDKI_CLUSTERS_DATA } from './data/clusters';
 
+function shuffleQuestions(list: Question[]): Question[] {
+  const next = [...list];
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+}
+
 const MainAppContent: React.FC = () => {
-  const { questions, mistakes, generateBalancedExamQuestions } = useEdki();
+  const { questions, subjects, mistakes, generateBalancedExamQuestions, isSimulationLocked } = useEdki();
   const { isTeacher, isAdmin, isLoggedIn, currentUser } = useAuth();
+  const simulationLocked = isSimulationLocked();
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | undefined>(undefined);
@@ -82,8 +91,12 @@ const MainAppContent: React.FC = () => {
   }
 
 
-  // Launch Official Exam Simulation (100 questions, 120 min, balanced by 7 clusters / all topics)
+  // Launch Official Exam Simulation (100 questions, 80 min, balanced by 7 clusters / all topics)
   const handleStartExam = () => {
+    if (simulationLocked) {
+      alert('Офіційну симуляцію ЄДКІ вже пройдено. Повторне складання доступне після скидання спроби викладачем.');
+      return;
+    }
     const examQuestions = generateBalancedExamQuestions(100);
 
     setActiveQuiz({
@@ -99,7 +112,7 @@ const MainAppContent: React.FC = () => {
   const handleStartClusterDrill = (clusterId: number) => {
     const cluster = EDKI_CLUSTERS_DATA.find(c => c.id === clusterId);
     const clusterQuestions = questions.filter(q => {
-      const sub = SUBJECTS_DATA.find(s => s.id === q.subjectId);
+      const sub = subjects.find(s => s.id === q.subjectId);
       return q.clusterId === clusterId || sub?.clusterId === clusterId;
     });
 
@@ -110,7 +123,7 @@ const MainAppContent: React.FC = () => {
 
     setActiveQuiz({
       isActive: true,
-      questions: clusterQuestions,
+      questions: shuffleQuestions(clusterQuestions),
       mode: 'cluster',
       clusterId,
       title: `Кластер ${clusterId}: ${cluster?.name || ''}`,
@@ -120,7 +133,7 @@ const MainAppContent: React.FC = () => {
 
   // Launch Topic Drill
   const handleStartTopicDrill = (subjectId: number) => {
-    const sub = SUBJECTS_DATA.find(s => s.id === subjectId);
+    const sub = subjects.find(s => s.id === subjectId);
     const subQuestions = questions.filter(q => q.subjectId === subjectId);
 
     if (subQuestions.length === 0) {
@@ -131,7 +144,7 @@ const MainAppContent: React.FC = () => {
 
     setActiveQuiz({
       isActive: true,
-      questions: subQuestions,
+      questions: shuffleQuestions(subQuestions),
       mode: 'topic',
       title: `Тематичний тренажер: ${sub?.name || 'Предмет'}`,
       subjectId,
@@ -141,10 +154,12 @@ const MainAppContent: React.FC = () => {
 
   // Launch Mistakes Workout
   const handleStartMistakesDrill = () => {
-    const mistakeQuestions = Object.values(mistakes)
-      .filter(m => !m.isMastered)
-      .map(m => questions.find(q => q.id === m.questionId))
-      .filter((q): q is Question => q !== undefined);
+    const mistakeQuestions = shuffleQuestions(
+      Object.values(mistakes)
+        .filter(m => !m.isMastered)
+        .map(m => questions.find(q => q.id === m.questionId))
+        .filter((q): q is Question => q !== undefined)
+    );
 
     if (mistakeQuestions.length === 0) {
       alert('У вас немає активних помилок для повторення! Чудова робота.');
@@ -162,8 +177,7 @@ const MainAppContent: React.FC = () => {
 
   // Launch Blitz Quiz
   const handleStartBlitz = () => {
-    const shuffled = [...questions].sort(() => 0.5 - Math.random());
-    const blitzQuestions = shuffled.slice(0, Math.min(10, shuffled.length));
+    const blitzQuestions = shuffleQuestions(questions).slice(0, Math.min(10, questions.length));
 
     setActiveQuiz({
       isActive: true,
@@ -178,7 +192,7 @@ const MainAppContent: React.FC = () => {
   const handleStartCustomQuiz = (quizQuestions: Question[], title: string, mode: TestMode = 'learning', subjectId?: number) => {
     setActiveQuiz({
       isActive: true,
-      questions: quizQuestions,
+      questions: shuffleQuestions(quizQuestions),
       mode,
       title,
       subjectId,
@@ -192,10 +206,12 @@ const MainAppContent: React.FC = () => {
       <Navbar 
         activeTab={effectiveTab} 
         setActiveTab={(tab) => {
-          setActiveTab(tab);
           if (activeQuiz.isActive) {
+            const leave = window.confirm('Вийти з тесту? Поточна спроба не буде збережена.');
+            if (!leave) return;
             handleExitQuiz();
           }
+          setActiveTab(tab);
         }}
         onStartExam={handleStartExam}
         isQuizActive={activeQuiz.isActive}
@@ -249,9 +265,19 @@ const MainAppContent: React.FC = () => {
                   Повноцінний екзаменаційний тест із <strong>100 запитань</strong> з усіх тем та <strong>7 офіційних кластерів компетенцій</strong>:
                   Нормативна база (8-12%), ІТ в кібербезпеці (14-18%), Безпека ІКС (15-25%), КСЗІ (8-10%), Управління безпекою (16-20%), Криптографія (11-15%), ТЗІ (12-16%).
                 </p>
+                {simulationLocked && (
+                  <p style={{ color: 'var(--accent-amber)', marginBottom: '16px', fontSize: '0.88rem' }}>
+                    Цю симуляцію вже складено. Повторне проходження можливе після скидання спроби викладачем.
+                  </p>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                  <button className="btn btn-primary" onClick={handleStartExam} style={{ fontSize: '0.94rem', padding: '12px 22px' }}>
-                    Розпочати симуляцію (100 питань, 1 год 20 хв)
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleStartExam}
+                    disabled={simulationLocked}
+                    style={{ fontSize: '0.94rem', padding: '12px 22px', opacity: simulationLocked ? 0.55 : 1 }}
+                  >
+                    {simulationLocked ? 'Симуляцію вже складено' : 'Розпочати симуляцію (100 питань, 1 год 20 хв)'}
                   </button>
                   <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')} style={{ fontSize: '0.94rem' }}>
                     Повернутися назад

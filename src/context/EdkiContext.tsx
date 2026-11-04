@@ -40,7 +40,8 @@ interface EdkiContextType {
   batchAddQuestions: (newQuestions: Question[]) => number;
   importQuestionsJson: (jsonString: string, targetOverrides?: { subjectId?: number; topicId?: string; subtopic?: string; clusterId?: number }) => { success: boolean; count: number; error?: string };
   exportBackupJson: () => string;
-  resetAllProgress: () => void;
+  resetAllProgress: (scope?: 'current' | 'all') => boolean;
+  allMistakes: Record<string, UserMistake>;
 
   // Subject & Topic actions
   addSubject: (subject: Omit<Subject, 'id'>) => Subject;
@@ -124,57 +125,14 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saved = localStorage.getItem(STORAGE_KEYS.ATTEMPTS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Drop leftover demo fixtures that used to be seeded into every browser
+          return parsed.filter((a: TestAttempt) => !String(a?.id || '').startsWith('att-mock-'));
+        }
       } catch (e) {}
     }
-    // Pre-populate some realistic student attempt data for group analytics
-    return [
-      {
-        id: 'att-mock-1',
-        userId: 'user-student-1',
-        studentName: 'Олександр Коваленко',
-        groupName: 'КБ-41',
-        date: '2024-03-12T14:30:00.000Z',
-        mode: 'simulation',
-        title: 'Офіційна симуляція ЄДКІ (125 «Кібербезпека»)',
-        totalQuestions: 25,
-        correctCount: 20,
-        scorePercentage: 80,
-        passed: true,
-        durationSeconds: 1140,
-        answers: []
-      },
-      {
-        id: 'att-mock-2',
-        userId: 'user-student-2',
-        studentName: 'Анна Мельниченко',
-        groupName: 'КБ-41',
-        date: '2024-03-13T10:15:00.000Z',
-        mode: 'simulation',
-        title: 'Офіційна симуляція ЄДКІ (125 «Кібербезпека»)',
-        totalQuestions: 25,
-        correctCount: 18,
-        scorePercentage: 72,
-        passed: true,
-        durationSeconds: 1220,
-        answers: []
-      },
-      {
-        id: 'att-mock-3',
-        userId: 'user-student-3',
-        studentName: 'Дмитро Шевченко',
-        groupName: 'КБ-42',
-        date: '2024-03-14T16:00:00.000Z',
-        mode: 'simulation',
-        title: 'Офіційна симуляція ЄДКІ (125 «Кібербезпека»)',
-        totalQuestions: 25,
-        correctCount: 13,
-        scorePercentage: 52,
-        passed: false,
-        durationSeconds: 1380,
-        answers: []
-      }
-    ];
+    return [];
   });
 
   // 3. User Mistakes Store (stores all mistakes partitioned by user ID)
@@ -347,9 +305,14 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
       completedAt: attemptData.completedAt || new Date().toISOString()
     };
 
-    newAttempt.answers.forEach(ans => {
-      recordQuestionResult(ans.questionId, ans.isCorrect);
-    });
+    // Learning / topic / blitz already record live on each click.
+    // Unanswered items must not enter the mistakes bank.
+    if (newAttempt.mode === 'simulation') {
+      newAttempt.answers.forEach(ans => {
+        if (ans.selectedOption == null) return;
+        recordQuestionResult(ans.questionId, ans.isCorrect);
+      });
+    }
 
     setAttempts(prev => [newAttempt, ...prev]);
     // Asynchronously persist to PostgreSQL backend
@@ -405,6 +368,7 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newQ: Question = { ...data, id, createdById: currentUser?.id };
     setQuestions(prev => [newQ, ...prev]);
     addAuditLog('Створено тестове завдання', `ID: ${id}, Тема: ${newQ.subtopic}`);
+    api.saveQuestion(newQ);
     return newQ;
   };
 
@@ -436,11 +400,13 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateQuestion = (updated: Question) => {
     setQuestions(prev => prev.map(q => (q.id === updated.id ? updated : q)));
     addAuditLog('Оновлено тестове завдання', `ID: ${updated.id}`);
+    api.updateQuestion(updated);
   };
 
   const deleteQuestion = (id: string) => {
     setQuestions(prev => prev.filter(q => q.id !== id));
     addAuditLog('Видалено тестове завдання', `ID: ${id}`);
+    api.deleteQuestion(id);
   };
 
   // Subject & Topic CRUD
@@ -629,31 +595,45 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const resetAllProgress = () => {
-    if (window.confirm('Ви впевнені, що бажаєте скинути історію тестувань та банк помилок?')) {
-      const uid = currentUser?.id || 'guest';
-      setAttempts(prev => prev.filter(a => a.userId !== uid));
-      setAllMistakes(prev => {
-        const next = { ...prev };
-        Object.keys(next).forEach(k => {
-          if (next[k].userId === uid) delete next[k];
-        });
-        return next;
-      });
-      setAllBookmarks(prev => {
-        const next = { ...prev };
-        delete next[uid];
-        return next;
-      });
+  const resetAllProgress = (scope: 'current' | 'all' = 'current'): boolean => {
+    const confirmed = window.confirm(
+      scope === 'all'
+        ? 'Скинути прогрес усіх користувачів? Банк питань залишиться.'
+        : 'Ви впевнені, що бажаєте скинути історію тестувань та банк помилок?'
+    );
+    if (!confirmed) return false;
+
+    if (scope === 'all') {
+      setAttempts([]);
+      setAllMistakes({});
+      setAllBookmarks({});
+      addAuditLog('Скидання прогресу', 'Очищено спроби, помилки та закладки всіх користувачів');
+      return true;
     }
+
+    const uid = currentUser?.id || 'guest';
+    setAttempts(prev => prev.filter(a => a.userId !== uid));
+    setAllMistakes(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (next[k].userId === uid) delete next[k];
+      });
+      return next;
+    });
+    setAllBookmarks(prev => {
+      const next = { ...prev };
+      delete next[uid];
+      return next;
+    });
+    addAuditLog('Скидання прогресу', `Очищено спроби користувача ${currentUser?.name || uid}`);
+    return true;
   };
 
-  // User-specific or general analytics
+  // Personal analytics for the signed-in user (teacher group stats use `attempts` directly)
   const analytics: UserAnalytics = useMemo(() => {
-    // Filter attempts for current student if student, or all if teacher/admin
-    const userAttempts = currentUser?.role === 'student'
-      ? attempts.filter(a => a.userId === currentUser?.id)
-      : attempts;
+    const userAttempts = currentUser?.id
+      ? attempts.filter(a => a.userId === currentUser.id)
+      : [];
 
     const totalTestsCompleted = userAttempts.length;
 
@@ -739,7 +719,7 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
     Object.values(mistakes).forEach(m => {
       const q = questions.find(item => item.id === m.questionId);
       if (q) {
-        const sub = SUBJECTS_DATA.find(s => s.id === q.subjectId);
+        const sub = subjects.find(s => s.id === q.subjectId);
         const top = sub?.topics.find(t => t.id === q.topicId);
         const key = q.topicId || 'unknown';
         if (!topicMistakeMap[key]) {
@@ -802,6 +782,7 @@ export const EdkiProvider: React.FC<{ children: React.ReactNode }> = ({ children
         clusters: EDKI_CLUSTERS_DATA,
         attempts,
         mistakes,
+        allMistakes,
         bookmarks,
         analytics,
         recordQuestionResult,

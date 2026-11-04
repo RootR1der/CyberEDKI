@@ -33,8 +33,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onStartBlitz,
   onNavigateTab
 }) => {
-  const { analytics, attempts, mistakes, questions } = useEdki();
+  const { analytics, attempts, mistakes, questions, subjects, isSimulationLocked } = useEdki();
   const { currentUser, isStudent, isTeacher, isAdmin } = useAuth();
+  const simulationLocked = isSimulationLocked();
   const activeMistakesCount = Object.values(mistakes).filter(m => !m.isMastered).length;
 
   const getReadinessLevel = (score: number) => {
@@ -106,10 +107,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button 
               className="btn btn-primary"
               onClick={onStartExam}
-              style={{ fontSize: '0.96rem', padding: '12px 22px' }}
+              disabled={simulationLocked}
+              title={simulationLocked ? 'Симуляцію вже складено' : undefined}
+              style={{ fontSize: '0.96rem', padding: '12px 22px', opacity: simulationLocked ? 0.55 : 1 }}
             >
               <GraduationCap size={19} />
-              <span>Офіційна симуляція ЄДКІ</span>
+              <span>{simulationLocked ? 'Симуляцію вже складено' : 'Офіційна симуляція ЄДКІ'}</span>
             </button>
 
             <button 
@@ -224,7 +227,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>сесій</span>
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            Симуляцій ЄДКІ: {attempts.filter(a => a.mode === 'simulation' && (isStudent ? a.userId === currentUser?.id : true)).length}
+            Симуляцій ЄДКІ: {attempts.filter(a => a.mode === 'simulation' && a.userId === currentUser?.id).length}
           </p>
         </div>
 
@@ -276,7 +279,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '14px' }}>
           {EDKI_CLUSTERS_DATA.map(cl => {
             const mastery = analytics.clusterMastery[cl.id] || { answered: 0, accuracy: 0 };
-            const qCount = questions.filter(q => q.clusterId === cl.id).length;
+            const qCount = questions.filter(q => {
+              const sub = subjects.find(s => s.id === q.subjectId);
+              return q.clusterId === cl.id || sub?.clusterId === cl.id;
+            }).length;
 
             return (
               <div
