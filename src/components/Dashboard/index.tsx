@@ -341,7 +341,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: '14px', width: '100%', minWidth: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '14px', width: '100%', minWidth: 0 }}>
             {analytics.weakTopics.map((wt, idx) => (
               <div 
                 key={idx}
@@ -352,11 +352,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   border: '1px solid var(--border-subtle)',
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  gap: '12px'
                 }}
               >
-                <div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#ffffff', marginBottom: '4px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#ffffff', marginBottom: '4px', lineHeight: 1.35 }}>
                     {wt.topicName}
                   </div>
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
@@ -365,7 +366,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 <button
                   className="btn btn-secondary"
-                  style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                  style={{ padding: '6px 14px', fontSize: '0.78rem', flexShrink: 0, whiteSpace: 'nowrap' }}
                   onClick={() => onStartTopicDrill(wt.subjectId)}
                 >
                   Вчити

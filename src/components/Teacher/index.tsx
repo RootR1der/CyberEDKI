@@ -114,13 +114,22 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
     const hasPassedSimulation = simulationAttempts.some(a => a.passed);
     const studentMistakes = Object.values(mistakes).filter(m => m.userId === student.id && !m.isMastered).length;
 
+    const clusterCount = studentAttempts.filter(a => a.mode === 'cluster').length;
+    const topicCount = studentAttempts.filter(a => a.mode === 'topic' || a.mode === 'learning').length;
+    const blitzCount = studentAttempts.filter(a => a.mode === 'blitz').length;
+    const mistakesCount = studentAttempts.filter(a => a.mode === 'mistakes').length;
+
     return {
       completedCount,
       avgScore,
       hasPassedSimulation,
       simulationCount: simulationAttempts.length,
       activeMistakes: studentMistakes,
-      lastAttempt: studentAttempts[0]
+      lastAttempt: studentAttempts[0],
+      clusterCount,
+      topicCount,
+      blitzCount,
+      mistakesCount
     };
   };
 
@@ -428,7 +437,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
         </div>
 
         {/* Mobile Cards View */}
-        <div className="mobile-block" style={{ flexDirection: 'column', gap: '12px' }}>
+        <div className="mobile-block" style={{ flexDirection: 'column', gap: '10px' }}>
           {filteredStudents.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '0.86rem' }}>
               Студентів не знайдено за заданими фільтрами.
@@ -443,37 +452,36 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
                     background: 'rgba(15, 23, 42, 0.7)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 'var(--radius-md)',
-                    padding: '14px',
+                    padding: '12px',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px'
+                    gap: '8px'
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: 'rgba(6, 182, 212, 0.15)',
-                        color: 'var(--accent-cyan)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '0.82rem',
-                        flexShrink: 0
-                      }}>
-                        {student.firstName[0]}{student.lastName[0]}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.92rem', wordBreak: 'break-word' }}>{student.name}</div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>{student.email}</div>
-                      </div>
+                  {/* Header row: avatar + name/email + group badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: 'rgba(6, 182, 212, 0.15)',
+                      color: 'var(--accent-cyan)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      flexShrink: 0
+                    }}>
+                      {student.firstName[0]}{student.lastName[0]}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
-                      <span className="badge badge-indigo">{student.groupName || '—'}</span>
-                      {!student.isActive && <span style={{ fontSize: '0.68rem', color: '#f87171', fontWeight: 600 }}>⊘ Деакт.</span>}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.86rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.name}</div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.email}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                      <span className="badge badge-indigo" style={{ fontSize: '0.68rem', padding: '2px 8px', whiteSpace: 'nowrap' }}>{student.groupName || '—'}</span>
+                      {!student.isActive && <span style={{ fontSize: '0.62rem', color: '#f87171', fontWeight: 600 }}>⊘ Деакт.</span>}
                     </div>
                   </div>
 
@@ -514,13 +522,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: '6px', paddingTop: '2px' }}>
                     <button
                       onClick={() => updateUserStatus(student.id, !student.isActive)}
                       className="btn btn-secondary"
-                      style={{ padding: '6px 10px', fontSize: '0.76rem', gap: '4px', minHeight: '34px' }}
+                      style={{ padding: '5px 10px', fontSize: '0.74rem', gap: '4px', minHeight: '32px', flex: 1 }}
                     >
-                      {student.isActive ? <Power size={13} color="var(--accent-emerald)" /> : <PowerOff size={13} color="#f87171" />}
+                      {student.isActive ? <Power size={12} color="var(--accent-emerald)" /> : <PowerOff size={12} color="#f87171" />}
                       <span>{student.isActive ? 'Активний' : 'Деактивовано'}</span>
                     </button>
 
@@ -531,9 +540,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
                         else if (pwd) alert('Пароль має бути не менше 6 символів');
                       }}
                       className="btn btn-secondary"
-                      style={{ padding: '6px 10px', fontSize: '0.76rem', gap: '4px', minHeight: '34px' }}
+                      style={{ padding: '5px 10px', fontSize: '0.74rem', gap: '4px', minHeight: '32px' }}
                     >
-                      <Key size={13} color="var(--accent-cyan)" />
+                      <Key size={12} color="var(--accent-cyan)" />
                       <span>Пароль</span>
                     </button>
 
@@ -543,9 +552,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigateTa
                         deleteUser(student.id);
                       }}
                       className="btn btn-secondary"
-                      style={{ padding: '6px 8px', color: 'var(--accent-rose)', minHeight: '34px' }}
+                      style={{ padding: '5px 8px', color: 'var(--accent-rose)', minHeight: '32px' }}
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>

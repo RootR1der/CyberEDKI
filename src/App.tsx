@@ -25,9 +25,8 @@ function shuffleQuestions(list: Question[]): Question[] {
 }
 
 const MainAppContent: React.FC = () => {
-  const { questions, subjects, mistakes, generateBalancedExamQuestions, isSimulationLocked } = useEdki();
+  const { questions, subjects, mistakes, generateBalancedExamQuestions } = useEdki();
   const { isTeacher, isAdmin, isLoggedIn, currentUser } = useAuth();
-  const simulationLocked = isSimulationLocked();
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | undefined>(undefined);
@@ -92,11 +91,8 @@ const MainAppContent: React.FC = () => {
 
 
   // Launch Official Exam Simulation (100 questions, 80 min, balanced by 7 clusters / all topics)
+  // No attempt limit — students can retake as many times as needed for practice
   const handleStartExam = () => {
-    if (simulationLocked) {
-      alert('Офіційну симуляцію ЄДКІ вже пройдено. Повторне складання доступне після скидання спроби викладачем.');
-      return;
-    }
     const examQuestions = generateBalancedExamQuestions(100);
 
     setActiveQuiz({
@@ -265,19 +261,13 @@ const MainAppContent: React.FC = () => {
                   Повноцінний екзаменаційний тест із <strong>100 запитань</strong> з усіх тем та <strong>7 офіційних кластерів компетенцій</strong>:
                   Нормативна база (8-12%), ІТ в кібербезпеці (14-18%), Безпека ІКС (15-25%), КСЗІ (8-10%), Управління безпекою (16-20%), Криптографія (11-15%), ТЗІ (12-16%).
                 </p>
-                {simulationLocked && (
-                  <p style={{ color: 'var(--accent-amber)', marginBottom: '16px', fontSize: '0.88rem' }}>
-                    Цю симуляцію вже складено. Повторне проходження можливе після скидання спроби викладачем.
-                  </p>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
                   <button
                     className="btn btn-primary"
                     onClick={handleStartExam}
-                    disabled={simulationLocked}
-                    style={{ fontSize: '0.94rem', padding: '12px 22px', opacity: simulationLocked ? 0.55 : 1 }}
+                    style={{ fontSize: '0.94rem', padding: '12px 22px' }}
                   >
-                    {simulationLocked ? 'Симуляцію вже складено' : 'Розпочати симуляцію (100 питань, 1 год 20 хв)'}
+                    Розпочати симуляцію (100 питань, 1 год 20 хв)
                   </button>
                   <button className="btn btn-secondary" onClick={() => setActiveTab('dashboard')} style={{ fontSize: '0.94rem' }}>
                     Повернутися назад
